@@ -1,0 +1,1196 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word ZIP / DOCX to HTML Excel</title>
+    <link rel="icon" href="data:,">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="word_zip_multilang.js"></script>
+    <style>
+        :root {
+            --bg: #f3f6fb;
+            --surface: #ffffff;
+            --surface-soft: #f8fafc;
+            --text: #172033;
+            --muted: #64748b;
+            --border: #dbe3ef;
+            --primary: #3157d5;
+            --primary-dark: #2445b3;
+            --success: #07845d;
+            --success-soft: #e8f8f2;
+            --danger: #c13245;
+            --danger-soft: #fff0f2;
+            --warning: #a85d00;
+            --warning-soft: #fff7e8;
+            --pending: #64748b;
+            --shadow: 0 18px 45px rgba(35, 55, 90, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background:
+                radial-gradient(circle at top left, rgba(49, 87, 213, 0.14), transparent 34rem),
+                var(--bg);
+            color: var(--text);
+            font-family: Inter, "Segoe UI", Arial, sans-serif;
+        }
+
+        button,
+        input,
+        select {
+            font: inherit;
+        }
+
+        .app-shell {
+            width: min(1480px, calc(100% - 32px));
+            margin: 28px auto 50px;
+        }
+
+        .hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 28px 32px;
+            color: #ffffff;
+            background: linear-gradient(125deg, #2445b3 0%, #3157d5 55%, #4f75eb 100%);
+            border-radius: 22px;
+            box-shadow: var(--shadow);
+        }
+
+        .hero h1 {
+            margin: 0 0 8px;
+            font-size: clamp(1.55rem, 3vw, 2.35rem);
+            line-height: 1.15;
+        }
+
+        .hero p {
+            margin: 0;
+            max-width: 760px;
+            color: rgba(255, 255, 255, 0.84);
+            line-height: 1.6;
+        }
+
+        .hero-badge {
+            flex: 0 0 auto;
+            padding: 10px 14px;
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12);
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .panel {
+            margin-top: 20px;
+            padding: 24px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: 0 8px 24px rgba(35, 55, 90, 0.07);
+        }
+
+        .panel-heading {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 18px;
+        }
+
+        .panel-heading h2 {
+            margin: 0 0 5px;
+            font-size: 1.15rem;
+        }
+
+        .panel-heading p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .upload-zone {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 18px;
+            padding: 22px;
+            border: 2px dashed #b8c7eb;
+            border-radius: 15px;
+            background: #f7f9ff;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .upload-zone.dragover {
+            border-color: var(--primary);
+            background: #eef2ff;
+        }
+
+        .upload-copy strong {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 1.02rem;
+        }
+
+        .upload-copy span {
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .file-input {
+            width: min(100%, 430px);
+            margin-top: 14px;
+            padding: 10px;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+        }
+
+        .options-row,
+        .actions-row,
+        .review-actions {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .options-row {
+            margin-top: 16px;
+        }
+
+        .checkbox-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            color: #334155;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .checkbox-label input {
+            width: 17px;
+            height: 17px;
+            accent-color: var(--primary);
+        }
+
+        .actions-row {
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 43px;
+            padding: 10px 16px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-weight: 750;
+            cursor: pointer;
+            transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+        }
+
+        .btn:not(:disabled):hover {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.48;
+        }
+
+        .btn-primary {
+            color: #ffffff;
+            background: var(--primary);
+        }
+
+        .btn-primary:not(:disabled):hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-success {
+            color: #ffffff;
+            background: var(--success);
+        }
+
+        .btn-secondary {
+            color: #334155;
+            background: #eef2f7;
+            border-color: #d8e0eb;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(120px, 1fr));
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .summary-card {
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+            background: var(--surface-soft);
+        }
+
+        .summary-card span {
+            display: block;
+            margin-bottom: 7px;
+            color: var(--muted);
+            font-size: 0.84rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .summary-card strong {
+            font-size: 1.6rem;
+        }
+
+        .summary-card.success strong {
+            color: var(--success);
+        }
+
+        .summary-card.error strong {
+            color: var(--danger);
+        }
+
+        .progress-wrap {
+            margin-top: 18px;
+        }
+
+        .progress-meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .progress-track {
+            height: 11px;
+            overflow: hidden;
+            background: #e8edf5;
+            border-radius: 999px;
+        }
+
+        .progress-bar {
+            width: 0;
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #55a3ff);
+            border-radius: inherit;
+            transition: width 0.2s ease;
+        }
+
+        .toolbar-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .search-box,
+        .filter-select {
+            min-height: 40px;
+            padding: 9px 11px;
+            color: var(--text);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+        }
+
+        .search-box {
+            width: min(100%, 360px);
+        }
+
+        .table-wrap {
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: 13px;
+        }
+
+        table {
+            width: 100%;
+            min-width: 980px;
+            border-collapse: collapse;
+        }
+
+        th,
+        td {
+            padding: 13px 14px;
+            border-bottom: 1px solid #e8edf4;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            color: #475569;
+            background: #f7f9fc;
+            font-size: 0.82rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr.row-error {
+            background: #fffafb;
+        }
+
+        .file-name {
+            max-width: 420px;
+            overflow-wrap: anywhere;
+            font-weight: 650;
+        }
+
+        .code-cell {
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-weight: 750;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 9px;
+            border-radius: 999px;
+            font-size: 0.82rem;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+
+        .status-waiting {
+            color: #526174;
+            background: #edf1f5;
+        }
+
+        .status-processing {
+            color: #1f4ca8;
+            background: #eaf1ff;
+        }
+
+        .status-success {
+            color: #056a4c;
+            background: var(--success-soft);
+        }
+
+        .status-error {
+            color: #a22235;
+            background: var(--danger-soft);
+        }
+
+        .detail-cell {
+            max-width: 430px;
+            color: var(--muted);
+            overflow-wrap: anywhere;
+        }
+
+        .error-text {
+            color: var(--danger);
+            font-weight: 650;
+        }
+
+        .small-btn {
+            padding: 7px 10px;
+            color: var(--primary);
+            background: #edf2ff;
+            border: 1px solid #ccd8fa;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .empty-state {
+            padding: 34px 18px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .review-panel {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-top: 20px;
+            padding: 20px;
+            border: 1px solid #f1cf8f;
+            border-radius: 14px;
+            background: var(--warning-soft);
+        }
+
+        .review-panel.visible {
+            display: flex;
+        }
+
+        .review-panel h3 {
+            margin: 0 0 6px;
+            color: #7a4700;
+        }
+
+        .review-panel p {
+            margin: 0;
+            color: #80530e;
+            line-height: 1.5;
+        }
+
+        .export-note {
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            display: none;
+            place-items: center;
+            padding: 20px;
+            background: rgba(12, 22, 40, 0.62);
+        }
+
+        .modal-backdrop.visible {
+            display: grid;
+        }
+
+        .modal {
+            width: min(980px, 100%);
+            max-height: min(82vh, 850px);
+            display: flex;
+            flex-direction: column;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+        }
+
+        .modal-header,
+        .modal-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 16px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .modal-footer {
+            justify-content: flex-end;
+            border-top: 1px solid var(--border);
+            border-bottom: none;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+        }
+
+        .modal pre {
+            flex: 1;
+            margin: 0;
+            padding: 20px;
+            overflow: auto;
+            color: #e6edf7;
+            background: #111827;
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: 0.87rem;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 900px) {
+            .hero,
+            .review-panel,
+            .panel-heading,
+            .toolbar-row {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .hero-badge {
+                align-self: flex-start;
+            }
+
+            .upload-zone {
+                grid-template-columns: 1fr;
+            }
+
+            .actions-row {
+                justify-content: flex-start;
+            }
+
+            .summary-grid {
+                grid-template-columns: repeat(2, minmax(120px, 1fr));
+            }
+        }
+
+        @media (max-width: 520px) {
+            .app-shell {
+                width: min(100% - 18px, 1480px);
+                margin-top: 10px;
+            }
+
+            .hero,
+            .panel {
+                padding: 18px;
+                border-radius: 14px;
+            }
+
+            .summary-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .summary-card:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main class="app-shell">
+        <header class="hero">
+            <div>
+                <h1>Word ZIP / DOCX → HTML Excel</h1>
+            <p>Xử lý nhãn đa ngôn ngữ từ file ZIP hoặc DOCX lẻ, theo dõi lỗi từng file và chỉ xuất Excel sau khi bạn duyệt kết quả.</p>
+            </div>
+            <div class="hero-badge">Xử lý ngay trên máy</div>
+        </header>
+
+        <section class="panel" aria-labelledby="upload-title">
+            <div class="panel-heading">
+                <div>
+            <h2 id="upload-title">1. Thêm ZIP hoặc DOCX và xử lý</h2>
+                    <p>Chọn ZIP để xử lý hàng loạt hoặc chọn trực tiếp một hay nhiều file .docx.</p>
+                </div>
+            </div>
+
+            <div class="upload-zone" id="upload-zone">
+                <div class="upload-copy">
+                    <strong>Chọn hoặc kéo thả file ZIP / DOCX</strong>
+                    <span>Hỗ trợ: FR 4087-4..., v0_FR 4087-4... và ES + PT 61103...</span>
+                    <input class="file-input" type="file" id="source-files" accept=".zip,.docx,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+                </div>
+                <div class="actions-row">
+                    <button class="btn btn-secondary" id="reset-button" type="button">Xóa tất cả</button>
+                    <button class="btn btn-primary" id="process-button" type="button">Quét &amp; xử lý</button>
+                </div>
+            </div>
+
+            <div class="options-row" style="color: var(--muted); line-height: 1.6;">
+                <strong style="color: var(--text);">Ngôn ngữ:</strong>
+                EN, FR, DE, CZ, PL, HU, ES, PT, IT, RO, SK, NL, DK, FI, SE, EE và file kép ES + PT / ES &gt; PT.
+            </div>
+
+            <div class="summary-grid" aria-label="Thống kê xử lý">
+                <div class="summary-card"><span>Tổng DOCX</span><strong id="count-total">0</strong></div>
+                <div class="summary-card"><span>Đang chờ</span><strong id="count-waiting">0</strong></div>
+                <div class="summary-card"><span>Đang xử lý</span><strong id="count-processing">0</strong></div>
+                <div class="summary-card success"><span>Hoàn thành</span><strong id="count-success">0</strong></div>
+                <div class="summary-card error"><span>Lỗi</span><strong id="count-error">0</strong></div>
+            </div>
+
+            <div class="progress-wrap">
+                <div class="progress-meta">
+                    <span id="progress-label">Chưa có dữ liệu</span>
+                    <strong id="progress-percent">0%</strong>
+                </div>
+                <div class="progress-track" aria-hidden="true">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-labelledby="tracking-title">
+            <div class="panel-heading">
+                <div>
+                    <h2 id="tracking-title">2. Theo dõi từng file</h2>
+                    <p>File lỗi không được đưa vào Excel. Nguyên nhân lỗi được giữ tại đây để bạn kiểm tra.</p>
+                </div>
+            </div>
+
+            <div class="toolbar-row">
+                <input class="search-box" id="search-input" type="search" placeholder="Tìm theo tên file hoặc mã sản phẩm...">
+                <select class="filter-select" id="status-filter" aria-label="Lọc trạng thái">
+                    <option value="all">Tất cả trạng thái</option>
+                    <option value="waiting">Đang chờ</option>
+                    <option value="processing">Đang xử lý</option>
+                    <option value="success">Hoàn thành</option>
+                    <option value="error">Lỗi</option>
+                </select>
+            </div>
+
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">#</th>
+                            <th>File DOCX</th>
+                            <th style="width: 150px;">Mã sản phẩm</th>
+                            <th style="width: 145px;">Trạng thái</th>
+                            <th>Chi tiết / nguyên nhân lỗi</th>
+                            <th style="width: 110px;">HTML</th>
+                        </tr>
+                    </thead>
+                    <tbody id="results-body">
+                        <tr id="empty-row">
+                            <td colspan="6" class="empty-state">Chưa có file DOCX nào được quét.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="review-panel" id="review-panel">
+                <div>
+                    <h3>Đã xử lý xong — đang chờ bạn duyệt</h3>
+                    <p id="review-message">Kiểm tra danh sách trước khi tạo Excel.</p>
+                    <div class="export-note" id="export-note"></div>
+                </div>
+                <div class="review-actions">
+                    <button class="btn btn-success" id="export-button" type="button" disabled>Duyệt &amp; Xuất Excel</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div class="modal-backdrop" id="preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="preview-title">HTML đã định dạng</h3>
+                <button class="small-btn" id="close-preview" type="button">Đóng</button>
+            </div>
+            <pre id="preview-code"></pre>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="copy-preview" type="button">Copy HTML</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+
+        const state = {
+            items: [],
+            processing: false,
+            processed: false,
+            exported: false,
+            currentPreviewId: null
+        };
+
+        const elements = {
+            sourceFiles: document.getElementById('source-files'),
+            uploadZone: document.getElementById('upload-zone'),
+            processButton: document.getElementById('process-button'),
+            resetButton: document.getElementById('reset-button'),
+            resultsBody: document.getElementById('results-body'),
+            searchInput: document.getElementById('search-input'),
+            statusFilter: document.getElementById('status-filter'),
+            reviewPanel: document.getElementById('review-panel'),
+            reviewMessage: document.getElementById('review-message'),
+            exportNote: document.getElementById('export-note'),
+            exportButton: document.getElementById('export-button'),
+            progressLabel: document.getElementById('progress-label'),
+            progressPercent: document.getElementById('progress-percent'),
+            progressBar: document.getElementById('progress-bar'),
+            previewBackdrop: document.getElementById('preview-backdrop'),
+            previewTitle: document.getElementById('preview-title'),
+            previewCode: document.getElementById('preview-code'),
+            closePreview: document.getElementById('close-preview'),
+            copyPreview: document.getElementById('copy-preview')
+        };
+
+        const STATUS_META = {
+            waiting: { label: 'Đang chờ', icon: '○' },
+            processing: { label: 'Đang xử lý', icon: '◌' },
+            success: { label: 'Hoàn thành', icon: '✓' },
+            error: { label: 'Lỗi', icon: '!' }
+        };
+
+        function cleanText(value) {
+            return String(value || '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/[ \t\r\f\v]+/g, ' ')
+                .replace(/\s+([,.;:!?])/g, '$1')
+                .trim();
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function basename(path) {
+            return String(path || '').split('/').pop().split('\\').pop();
+        }
+
+        const SUPPORTED_LANGUAGES = new Set([
+            'EN', 'FR', 'DE', 'CZ', 'PL', 'HU', 'ES', 'PT',
+            'IT', 'RO', 'SK', 'NL', 'DK', 'FI', 'SE', 'EE'
+        ]);
+
+        function parseFileIdentity(fileName) {
+            const stem = basename(fileName).replace(/\.docx$/i, '').trim();
+            const identityStem = stem.replace(/^v\d+_/i, '');
+            const match = identityStem.match(/^([A-Z]{2})(?:\s*([+>])\s*([A-Z]{2}))?\s+(\d+(?:-\d+)?)(?=[\s_]|$)/i);
+            if (!match) {
+                throw new Error('Tên file phải theo dạng “FR 4087-4 ...”, “v0_FR 4087-4 ...”, “EN 7170 ...” hoặc “ES + PT 61103 ...”.');
+            }
+            const languages = [match[1].toUpperCase()];
+            if (match[3]) languages.push(match[3].toUpperCase());
+            const unsupported = languages.filter(language => !SUPPORTED_LANGUAGES.has(language));
+            if (unsupported.length) {
+                throw new Error(`Mã ngôn ngữ chưa hỗ trợ: ${unsupported.join(', ')}.`);
+            }
+            const productName = identityStem
+                .slice(match[0].length)
+                .replace(/^[\s_]+/, '')
+                .trim();
+            return {
+                languages,
+                productCode: match[4],
+                productName,
+                separator: match[2] || ''
+            };
+        }
+
+        function runPropertyEnabled(run, localName) {
+            const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+            const property = run.getElementsByTagNameNS(namespace, localName)[0];
+            if (!property) return false;
+            const value = property.getAttributeNS(namespace, 'val') || property.getAttribute('w:val');
+            return !value || !/^(0|false|off)$/i.test(value);
+        }
+
+        async function readDocxParagraphs(docxBytes) {
+            let zip;
+            try {
+                zip = await JSZip.loadAsync(docxBytes);
+            } catch (_error) {
+                throw new Error('DOCX bị hỏng hoặc không đúng định dạng Word.');
+            }
+            const documentPart = zip.file('word/document.xml');
+            if (!documentPart) {
+                throw new Error('DOCX không hợp lệ hoặc thiếu word/document.xml.');
+            }
+
+            const xmlText = await documentPart.async('string');
+            const xml = new DOMParser().parseFromString(xmlText, 'application/xml');
+            if (xml.querySelector('parsererror')) {
+                throw new Error('Không đọc được XML bên trong DOCX.');
+            }
+
+            const namespace = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+            const paragraphs = [];
+            for (const paragraph of xml.getElementsByTagNameNS(namespace, 'p')) {
+                const segments = [];
+                for (const run of paragraph.getElementsByTagNameNS(namespace, 'r')) {
+                    let text = '';
+                    for (const child of run.childNodes) {
+                        if (child.namespaceURI !== namespace) continue;
+                        if (child.localName === 't' || child.localName === 'delText') text += child.textContent || '';
+                        if (child.localName === 'tab') text += '\t';
+                        if (child.localName === 'br' || child.localName === 'cr') text += '\n';
+                    }
+                    if (!text) continue;
+                    segments.push({
+                        text,
+                        bold: runPropertyEnabled(run, 'b') || runPropertyEnabled(run, 'bCs'),
+                        italic: runPropertyEnabled(run, 'i') || runPropertyEnabled(run, 'iCs')
+                    });
+                }
+                const text = cleanText(segments.map(segment => segment.text).join(''));
+                if (text) paragraphs.push({ text, segments });
+            }
+            return paragraphs;
+        }
+
+        async function convertDocx(item) {
+            const identity = parseFileIdentity(item.fileName);
+            item.productCode = identity.productCode;
+            item.productName = identity.productName;
+            const bytes = item.entry
+                ? await item.entry.async('uint8array')
+                : new Uint8Array(await item.file.arrayBuffer());
+            const paragraphs = await readDocxParagraphs(bytes);
+            const result = window.multilingualWordParser.convert(identity, paragraphs);
+            if (result.html.length > 32700) throw new Error('HTML vượt giới hạn ký tự của một ô Excel.');
+            item.languages = result.languages;
+            return result.html;
+        }
+
+        function createItemRow(item) {
+            const row = document.createElement('tr');
+            row.id = `item-row-${item.id}`;
+            row.dataset.status = item.status;
+            row.innerHTML = `
+                <td class="index-cell"></td>
+                <td><div class="file-name"></div><small class="source-name"></small></td>
+                <td class="code-cell"></td>
+                <td class="status-cell"></td>
+                <td class="detail-cell"></td>
+                <td class="action-cell"></td>`;
+            return row;
+        }
+
+        function updateItemRow(item) {
+            let row = document.getElementById(`item-row-${item.id}`);
+            if (!row) {
+                row = createItemRow(item);
+                elements.resultsBody.appendChild(row);
+            }
+            const statusMeta = STATUS_META[item.status];
+            row.dataset.status = item.status;
+            row.classList.toggle('row-error', item.status === 'error');
+            row.querySelector('.index-cell').textContent = String(item.index + 1);
+            row.querySelector('.file-name').textContent = item.fileName;
+            row.querySelector('.source-name').textContent = item.sourceType === 'zip'
+                ? `ZIP: ${item.sourceName}`
+                : 'File DOCX tải trực tiếp';
+            row.querySelector('.code-cell').textContent = item.productCode || '—';
+            row.querySelector('.status-cell').innerHTML = `<span class="status-badge status-${item.status}">${statusMeta.icon} ${statusMeta.label}</span>`;
+            const detail = row.querySelector('.detail-cell');
+            detail.textContent = item.detail || '—';
+            detail.classList.toggle('error-text', item.status === 'error');
+
+            const actionCell = row.querySelector('.action-cell');
+            actionCell.replaceChildren();
+            if (item.status === 'success') {
+                const previewButton = document.createElement('button');
+                previewButton.type = 'button';
+                previewButton.className = 'small-btn';
+                previewButton.textContent = 'Xem HTML';
+                previewButton.addEventListener('click', () => openPreview(item.id));
+                actionCell.appendChild(previewButton);
+            } else {
+                actionCell.textContent = '—';
+            }
+            applyFilters();
+        }
+
+        function rebuildRows() {
+            elements.resultsBody.replaceChildren();
+            if (!state.items.length) {
+                const row = document.createElement('tr');
+                row.innerHTML = '<td colspan="6" class="empty-state">Chưa có file DOCX nào được quét.</td>';
+                elements.resultsBody.appendChild(row);
+                return;
+            }
+            for (const item of state.items) updateItemRow(item);
+        }
+
+        function applyFilters() {
+            const query = elements.searchInput.value.trim().toLowerCase();
+            const status = elements.statusFilter.value;
+            for (const item of state.items) {
+                const row = document.getElementById(`item-row-${item.id}`);
+                if (!row) continue;
+                const matchesStatus = status === 'all' || item.status === status;
+                const haystack = `${item.fileName} ${item.productCode || ''} ${item.productName || ''} ${item.detail || ''}`.toLowerCase();
+                row.hidden = !(matchesStatus && (!query || haystack.includes(query)));
+            }
+        }
+
+        function updateSummary() {
+            const counts = { waiting: 0, processing: 0, success: 0, error: 0 };
+            for (const item of state.items) counts[item.status]++;
+            document.getElementById('count-total').textContent = state.items.length;
+            document.getElementById('count-waiting').textContent = counts.waiting;
+            document.getElementById('count-processing').textContent = counts.processing;
+            document.getElementById('count-success').textContent = counts.success;
+            document.getElementById('count-error').textContent = counts.error;
+
+            const completed = counts.success + counts.error;
+            const percent = state.items.length ? Math.round((completed / state.items.length) * 100) : 0;
+            elements.progressBar.style.width = `${percent}%`;
+            elements.progressPercent.textContent = `${percent}%`;
+            if (!state.items.length) elements.progressLabel.textContent = 'Chưa có dữ liệu';
+            else if (state.processing) elements.progressLabel.textContent = `Đã xử lý ${completed}/${state.items.length} file`;
+            else if (state.processed) elements.progressLabel.textContent = `Hoàn tất ${completed}/${state.items.length} file`;
+            else elements.progressLabel.textContent = `Đã tìm thấy ${state.items.length} file DOCX`;
+
+            return counts;
+        }
+
+        function setControlsForProcessing(isProcessing) {
+            elements.processButton.disabled = isProcessing;
+            elements.resetButton.disabled = isProcessing;
+            elements.sourceFiles.disabled = isProcessing;
+        }
+
+        function resetBatch({ preserveFiles = false } = {}) {
+            state.items = [];
+            state.processing = false;
+            state.processed = false;
+            state.exported = false;
+            state.currentPreviewId = null;
+            if (!preserveFiles) elements.sourceFiles.value = '';
+            elements.reviewPanel.classList.remove('visible');
+            elements.exportButton.disabled = true;
+            elements.exportButton.textContent = 'Duyệt & Xuất Excel';
+            elements.exportNote.textContent = '';
+            elements.searchInput.value = '';
+            elements.statusFilter.value = 'all';
+            rebuildRows();
+            updateSummary();
+        }
+
+        async function scanSelectedFiles(files) {
+            const items = [];
+            let id = 0;
+            for (const sourceFile of files) {
+                if (/\.docx$/i.test(sourceFile.name)) {
+                    if (/^~\$/i.test(sourceFile.name)) continue;
+                    items.push({
+                        id: id++,
+                        index: items.length,
+                        sourceType: 'docx',
+                        sourceName: sourceFile.name,
+                        fileName: sourceFile.name,
+                        file: sourceFile,
+                        productCode: '',
+                        productName: '',
+                        status: 'waiting',
+                        detail: 'Đang chờ xử lý',
+                        html: ''
+                    });
+                    continue;
+                }
+
+                if (!/\.zip$/i.test(sourceFile.name)) continue;
+                let archive;
+                try {
+                    archive = await JSZip.loadAsync(sourceFile);
+                } catch (error) {
+                    throw new Error(`Không mở được ZIP “${sourceFile.name}”: ${error.message}`);
+                }
+
+                const entries = Object.values(archive.files)
+                    .filter(entry => !entry.dir)
+                    .filter(entry => /\.docx$/i.test(entry.name))
+                    .filter(entry => !/(^|\/)__MACOSX\//i.test(entry.name))
+                    .filter(entry => !/^~\$/i.test(basename(entry.name)))
+                    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+                for (const entry of entries) {
+                    items.push({
+                        id: id++,
+                        index: items.length,
+                        sourceType: 'zip',
+                        sourceName: sourceFile.name,
+                        entryName: entry.name,
+                        fileName: basename(entry.name),
+                        entry,
+                        productCode: '',
+                        productName: '',
+                        status: 'waiting',
+                        detail: 'Đang chờ xử lý',
+                        html: ''
+                    });
+                }
+            }
+            return items;
+        }
+
+        async function processSelectedFiles() {
+            const files = [...elements.sourceFiles.files]
+                .filter(file => /\.(zip|docx)$/i.test(file.name));
+            if (!files.length) {
+                alert('Vui lòng chọn ít nhất một file ZIP hoặc DOCX.');
+                return;
+            }
+            if (typeof JSZip === 'undefined' || typeof XLSX === 'undefined') {
+                alert('Không tải được thư viện xử lý ZIP/Excel. Hãy kiểm tra Internet và tải lại trang.');
+                return;
+            }
+
+            resetBatch({ preserveFiles: true });
+            state.processing = true;
+            setControlsForProcessing(true);
+            elements.progressLabel.textContent = 'Đang quét file...';
+
+            try {
+                state.items = await scanSelectedFiles(files);
+                if (!state.items.length) throw new Error('Không tìm thấy file .docx nào để xử lý.');
+                rebuildRows();
+                updateSummary();
+
+                for (const item of state.items) {
+                    item.status = 'processing';
+                    item.detail = 'Đang đọc và định dạng Word...';
+                    updateItemRow(item);
+                    updateSummary();
+                    await new Promise(resolve => setTimeout(resolve, 0));
+
+                    try {
+                        item.html = await convertDocx(item);
+                        item.status = 'success';
+                        item.detail = `Đã tạo HTML: ${(item.languages || []).join(' → ')}`;
+                    } catch (error) {
+                        item.status = 'error';
+                        item.detail = error.message || 'Lỗi không xác định';
+                        item.html = '';
+                    }
+                    updateItemRow(item);
+                    updateSummary();
+                }
+
+                state.processing = false;
+                state.processed = true;
+                const counts = updateSummary();
+                elements.reviewPanel.classList.add('visible');
+                elements.reviewMessage.textContent = `Hoàn thành ${counts.success} file, lỗi ${counts.error} file. Excel sẽ chỉ chứa các file hoàn thành.`;
+                elements.exportNote.textContent = counts.success
+                    ? 'Tool chưa tạo file Excel. Hãy xem lỗi và kiểm tra HTML, sau đó bấm nút duyệt.'
+                    : 'Không có file hoàn thành nên chưa thể xuất Excel.';
+                elements.exportButton.disabled = counts.success === 0;
+                elements.exportButton.textContent = `Duyệt & Xuất Excel (${counts.success} dòng)`;
+            } catch (error) {
+                state.processing = false;
+                state.processed = false;
+                elements.progressLabel.textContent = error.message;
+                alert(error.message);
+            } finally {
+                setControlsForProcessing(false);
+            }
+        }
+
+        function makeOutputName() {
+            const now = new Date();
+            const pad = value => String(value).padStart(2, '0');
+            const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
+            const sourceFiles = [...elements.sourceFiles.files];
+            const prefix = sourceFiles.length === 1
+                ? sourceFiles[0].name.replace(/\.(zip|docx)$/i, '').replace(/[^a-z0-9_-]+/gi, '_').replace(/^_+|_+$/g, '')
+                : 'word_labels';
+            return `${prefix || 'word_labels'}_html_${stamp}.xlsx`;
+        }
+
+        function exportApprovedResults() {
+            if (!state.processed || state.processing) {
+                alert('Hãy đợi xử lý hoàn tất trước khi duyệt xuất Excel.');
+                return;
+            }
+            if (state.exported) return;
+            const successfulItems = state.items.filter(item => item.status === 'success');
+            if (!successfulItems.length) {
+                alert('Không có file hoàn thành để xuất Excel.');
+                return;
+            }
+
+            const data = [
+                ['Product Code', 'name', 'HTML Code'],
+                ...successfulItems.map(item => [item.productCode, item.productName, item.html])
+            ];
+            const worksheet = XLSX.utils.aoa_to_sheet(data);
+            worksheet['!cols'] = [{ wch: 18 }, { wch: 45 }, { wch: 120 }];
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
+            XLSX.writeFile(workbook, makeOutputName());
+
+            state.exported = true;
+            elements.exportButton.disabled = true;
+            elements.exportButton.textContent = 'Đã duyệt & xuất Excel';
+            elements.exportNote.textContent = `Đã xuất ${successfulItems.length} dòng thành công. Muốn tạo file mới, hãy bấm “Xóa tất cả” và xử lý lại.`;
+        }
+
+        function openPreview(itemId) {
+            const item = state.items.find(candidate => candidate.id === itemId);
+            if (!item || item.status !== 'success') return;
+            state.currentPreviewId = itemId;
+            elements.previewTitle.textContent = `${item.productCode} — ${item.fileName}`;
+            elements.previewCode.textContent = item.html;
+            elements.previewBackdrop.classList.add('visible');
+        }
+
+        function closePreview() {
+            state.currentPreviewId = null;
+            elements.previewBackdrop.classList.remove('visible');
+        }
+
+        async function copyPreviewHtml() {
+            const text = elements.previewCode.textContent;
+            if (!text) return;
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (_error) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                textarea.remove();
+            }
+            elements.copyPreview.textContent = 'Đã copy';
+            setTimeout(() => { elements.copyPreview.textContent = 'Copy HTML'; }, 1200);
+        }
+
+        elements.processButton.addEventListener('click', processSelectedFiles);
+        elements.resetButton.addEventListener('click', () => resetBatch());
+        elements.exportButton.addEventListener('click', exportApprovedResults);
+        elements.searchInput.addEventListener('input', applyFilters);
+        elements.statusFilter.addEventListener('change', applyFilters);
+        elements.closePreview.addEventListener('click', closePreview);
+        elements.copyPreview.addEventListener('click', copyPreviewHtml);
+        elements.previewBackdrop.addEventListener('click', event => {
+            if (event.target === elements.previewBackdrop) closePreview();
+        });
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape') closePreview();
+        });
+
+        for (const eventName of ['dragenter', 'dragover']) {
+            elements.uploadZone.addEventListener(eventName, event => {
+                event.preventDefault();
+                elements.uploadZone.classList.add('dragover');
+            });
+        }
+        for (const eventName of ['dragleave', 'drop']) {
+            elements.uploadZone.addEventListener(eventName, event => {
+                event.preventDefault();
+                elements.uploadZone.classList.remove('dragover');
+            });
+        }
+        elements.uploadZone.addEventListener('drop', event => {
+            const sourceFiles = [...event.dataTransfer.files].filter(file => /\.(zip|docx)$/i.test(file.name));
+            if (!sourceFiles.length) return;
+            const transfer = new DataTransfer();
+            sourceFiles.forEach(file => transfer.items.add(file));
+            elements.sourceFiles.files = transfer.files;
+        });
+
+        resetBatch();
+
+        window.batchWordTool = {
+            parseFileIdentity,
+            convertLanguageBlocks: window.multilingualWordParser.convert,
+            parseMetrics: window.multilingualWordParser.parseMetrics
+        };
+    </script>
+</body>
+
+</html>
+
+
