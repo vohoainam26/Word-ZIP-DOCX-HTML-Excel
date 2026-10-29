@@ -6,6 +6,25 @@
         'IT', 'RO', 'SK', 'NL', 'DK', 'FI', 'SE', 'EE'
     ]);
 
+    const STORAGE_TRANSLATIONS = {
+        EN: { heading: 'Storage.', text: 'Store at room temperature.' },
+        FR: { heading: 'Conservation.', text: 'Conserver à température ambiante.' },
+        DE: { heading: 'Lagerung.', text: 'Bei Raumtemperatur lagern.' },
+        CZ: { heading: 'Skladování.', text: 'Skladujte při pokojové teplotě.' },
+        PL: { heading: 'Przechowywanie.', text: 'Przechowywać w temperaturze pokojowej.' },
+        HU: { heading: 'Tárolás.', text: 'Szobahőmérsékleten tárolandó.' },
+        ES: { heading: 'Conservación.', text: 'Conservar a temperatura ambiente.' },
+        PT: { heading: 'Conservação.', text: 'Conservar à temperatura ambiente.' },
+        IT: { heading: 'Conservazione.', text: 'Conservare a temperatura ambiente.' },
+        RO: { heading: 'Păstrare.', text: 'A se păstra la temperatura camerei.' },
+        SK: { heading: 'Skladovanie.', text: 'Skladujte pri izbovej teplote.' },
+        NL: { heading: 'Bewaring.', text: 'Bewaren bij kamertemperatuur.' },
+        DK: { heading: 'Opbevaring.', text: 'Opbevares ved stuetemperatur.' },
+        FI: { heading: 'Säilytys.', text: 'Säilytä huoneenlämmössä.' },
+        SE: { heading: 'Förvaring.', text: 'Förvaras i rumstemperatur.' },
+        EE: { heading: 'Säilitamine.', text: 'Hoida toatemperatuuril.' }
+    };
+
     const SUBITEM_PATTERNS = [
         /^of\s+which\b/i,
         /^dont\b/i,
@@ -256,10 +275,10 @@
             else lines.push(`<p><b>${escapeHtml(metric.label)}:</b> ${escapeHtml(metric.value)}</p>`);
         }
 
-        if (data.language === 'EN') {
-            lines.push('<p><strong>Storage.</strong></p>');
-            lines.push('<p><span>Store at room temperature.</span></p>');
-        }
+        const storage = STORAGE_TRANSLATIONS[data.language];
+        if (!storage) throw new Error(`Thiếu bản dịch Storage cho ngôn ngữ ${data.language}.`);
+        lines.push(`<p><strong>${escapeHtml(storage.heading)}</strong></p>`);
+        lines.push(`<p><span>${escapeHtml(storage.text)}</span></p>`);
         return lines.join('\n');
     }
 
