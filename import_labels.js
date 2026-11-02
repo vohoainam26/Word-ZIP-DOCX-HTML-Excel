@@ -36,20 +36,20 @@
     // found in Word is kept. Unknown rows are accepted when the source table
     // provides one unambiguous label per detected language.
     const NUTRIENT_ALIASES = {
-        EN: ['Energy', 'Fat', 'Of Which Saturated', 'Carbohydrates', 'Of Which Sugars', 'Dietary Fiber', 'Fiber', 'Protein', 'Salt', 'Sodium'],
-        FR: ['Énergie', 'Grasse', 'Matières Grasses', 'Dont Acides Gras Saturés', 'Glucides', 'Dont Sucres', 'Fibres Alimentaires', 'Fibres', 'Protéines', 'Sel', 'Sodium'],
+        EN: ['Energy', 'Fat', 'Of Which Saturated', 'Carbohydrates', 'Of Which Sugars', 'Dietary Fiber', 'Fiber', 'Protein', 'Proteins', 'Salt', 'Sodium'],
+        FR: ['Énergie', 'Grasse', 'Graisse', 'Matière Grasse', 'Matières Grasses', 'Dont Acides Gras Saturés', 'Glucides', 'Dont Sucres', 'Fibres Alimentaires', 'Fibres', 'Protéines', 'Sel', 'Sodium'],
         DE: ['Energie', 'Fett', 'Davon Gesättigte Fettsäuren', 'Kohlenhydrate', 'Davon Zucker', 'Ballaststoffe', 'Eiweiss', 'Eiweiß', 'Salz', 'Natrium'],
-        CZ: ['Energie', 'Tuky', 'Z Toho Nasycené Mastné Kyseliny', 'Sacharidy', 'Z Toho Cukry', 'Vláknina', 'Bílkoviny', 'Sůl', 'Sodík'],
+        CZ: ['Energie', 'Tuky', 'Tuk', 'Z Toho Nasycené Mastné Kyseliny', 'Sacharidy', 'Z Toho Cukry', 'Vláknina', 'Bílkoviny', 'Sůl', 'Sodík'],
         PL: ['Energia', 'Tłuszcz', 'W Tym Kwasy Tłuszczowe Nasycone', 'Węglowodany', 'W Tym Cukry', 'Błonnik', 'Białko', 'Sól', 'Sód'],
         HU: ['Energia', 'Zsír', 'Amelyből Telített Zsírsavak', 'Szénhidrá', 'Szénhidrát', 'Amelyből Cukrok', 'Élelmi Rost', 'Fehérje', 'Só', 'Nátrium'],
         ES: ['Energía', 'Grasas', 'De Las Cuales Saturadas', 'Hidratos De Carbono', 'De Los Cuales Azúcares', 'Fibra Alimentaria', 'Proteínas', 'Sal', 'Sodio'],
         PT: ['Energia', 'Lípidos', 'Dos Quais Saturados', 'Hidratos De Carbono', 'Dos Quais Açúcares', 'Fibra Alimentar', 'Proteínas', 'Sal', 'Sódio'],
-        IT: ['Energia', 'Grassi', 'Di Cui Acidi Grassi Saturi', 'Carboidrati', 'Di Cui Zuccheri', 'Fibre', 'Proteine', 'Sale', 'Sodio'],
-        RO: ['Energie', 'Grăsimi', 'Din Care Acizi Grași Saturați', 'Glucide', 'Din Care Zaharuri', 'Fibre', 'Proteine', 'Sare', 'Sodiu'],
+        IT: ['Energia', 'Grassi', 'Di Cui Acidi Grassi Saturi', 'Carboidrati', 'Di Cui Zuccheri', 'Fibre', 'Fibre Alimentari', 'Proteine', 'Sale', 'Sodio'],
+        RO: ['Energie', 'Grăsimi', 'Din Care Acizi Grași Saturați', 'Glucide', 'Din Care Zaharuri', 'Fibre', 'Fibre Alimentare', 'Proteine', 'Sare', 'Sodiu'],
         SK: ['Energia', 'Tuky', 'Z Toho Nasýtené Mastné Kyseliny', 'Sacharidy', 'Z Toho Cukry', 'Vláknina', 'Bielkoviny', 'Soľ', 'Sodík'],
         NL: ['Energie', 'Vetten', 'Waarvan Verzadigd', 'Koolhydraten', 'Waarvan Suikers', 'Voedingsvezels', 'Eiwitten', 'Zout', 'Natrium'],
-        DK: ['Energi', 'Fedt', 'Heraf Mættede', 'Kulhydrat', 'Heraf Sukker', 'Kostfibre', 'Kostfibe', 'Protein', 'Salt', 'Natrium'],
-        FI: ['Energia', 'Rasva', 'Josta Tyydyttynyttä', 'Hiilihydraatit', 'Josta Sokereita', 'Ravintokuitu', 'Proteiini', 'Suola', 'Natrium'],
+        DK: ['Energi', 'Fedt', 'Heraf Mættede', 'Kulhydrat', 'Kulhydrater', 'Heraf Sukker', 'Kostfibre', 'Kostfibe', 'Kostfiber', 'Protein', 'Salt', 'Natrium'],
+        FI: ['Energia', 'Rasva', 'Josta Tyydyttynyttä', 'Joista Tyydyttyneitä', 'Hiilihydraatit', 'Josta Sokereita', 'Joista Sokereita', 'Ravintokuitu', 'Proteiini', 'Suola', 'Natrium'],
         SE: ['Energi', 'Fett', 'Varav Mättat', 'Varav Mättat Fett', 'Kolhydrater', 'Varav Sockerarter', 'Kostfiber', 'Protein', 'Salt', 'Natrium'],
         EE: ['Energia', 'Rasvad', 'Millest Küllastunud', 'Süsivesikud', 'Millest Suhkrud', 'Kiudained', 'Valgud', 'Sool', 'Naatrium']
     };
@@ -65,7 +65,7 @@
         DE: [/^enthalt\b/, /^kann\b.*\benthalten\b/, /^warnung\b/],
         CZ: [/^obsahuje\b/, /^muze obsahovat\b/, /^varovani\b/],
         PL: [/^zawiera\b/, /^moze zawierac\b/, /^ostrzezenie\b/],
-        HU: [/\btartalmaz\b/, /^figyelmeztetes\b/],
+        HU: [/^(?:\S+\s+){0,5}tartalmaz\b/, /^figyelmeztetes\b/],
         ES: [/^contiene\b/, /^puede contener\b/, /^advertencia\b/],
         PT: [/^contem\b/, /^pode conter\b/, /^aviso\b/],
         IT: [/^contiene\b/, /^puo contenere\b/, /^avvertenza\b/],
@@ -188,6 +188,17 @@
         return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    function ingredientHeadingPattern(language) {
+        const candidates = [
+            INGREDIENT_HEADINGS[language],
+            ...Object.values(INGREDIENT_HEADINGS),
+            'Ingrédientes'
+        ].filter(Boolean).sort((left, right) => right.length - left.length);
+        const alternatives = [...new Set(candidates.map(candidate => candidate.toLocaleLowerCase()))]
+            .map(candidate => escapeRegExp(candidate).replace(/\s+/g, '\\s+'));
+        return new RegExp(`(${alternatives.join('|')})(?:\\s*:\\s*|\\s+)`, 'i');
+    }
+
     function runPropertyEnabled(run, localName) {
         const property = run.getElementsByTagNameNS(W_NS, localName)[0];
         if (!property) return false;
@@ -255,14 +266,26 @@
         const body = xml.getElementsByTagNameNS(W_NS, 'body')[0];
         const paragraphs = [];
         const tables = [];
-        for (const child of body.childNodes) {
-            if (child.namespaceURI !== W_NS) continue;
-            if (child.localName === 'p') {
-                const paragraph = paragraphData(child);
-                if (paragraph.text) paragraphs.push(paragraph);
+
+        // Word may wrap normal paragraphs/tables in content controls (w:sdt),
+        // custom XML or compatibility containers. Walk those block containers
+        // recursively, while treating each paragraph/table as one complete block.
+        function collectBlocks(container) {
+            for (const child of container.childNodes) {
+                if (child.nodeType !== 1) continue;
+                if (child.namespaceURI === W_NS && child.localName === 'p') {
+                    const paragraph = paragraphData(child);
+                    if (paragraph.text) paragraphs.push(paragraph);
+                    continue;
+                }
+                if (child.namespaceURI === W_NS && child.localName === 'tbl') {
+                    tables.push(tableData(child));
+                    continue;
+                }
+                collectBlocks(child);
             }
-            if (child.localName === 'tbl') tables.push(tableData(child));
         }
+        collectBlocks(body);
         return { paragraphs, tables };
     }
 
@@ -363,30 +386,90 @@
 
     function languageBlocks(paragraphs) {
         const blocks = [];
+        const markers = [];
         const markerPattern = /(?:^|[\r\n])[\t ]*[►▶]?[\t ]*\(([A-Z]{2})\)[\t ]*/gim;
         paragraphs.forEach((paragraph, paragraphIndex) => {
             const raw = paragraph.segments.map(segment => segment.text).join('');
-            const markers = [];
             markerPattern.lastIndex = 0;
             let match;
             while ((match = markerPattern.exec(raw)) !== null) {
                 const language = match[1].toUpperCase();
                 if (!LANGUAGES.includes(language)) continue;
                 const leadingBreakLength = /^[\r\n]/.test(match[0]) ? 1 : 0;
-                markers.push({ language, start: match.index + leadingBreakLength });
+                markers.push({ language, paragraphIndex, start: match.index + leadingBreakLength });
             }
-            markers.forEach((marker, markerIndex) => {
-                const end = markers[markerIndex + 1]?.start ?? raw.length;
-                const segments = sliceSegments(paragraph.segments, marker.start, end);
-                if (!segments.length) return;
-                blocks.push({
-                    language: marker.language,
-                    paragraphIndex,
-                    paragraph: { text: clean(segments.map(segment => segment.text).join('')), segments }
-                });
+        });
+
+        function appendParagraph(target, segments) {
+            if (!segments.length) return;
+            if (target.length) target.push({ text: '\n', bold: false, italic: false, underline: false });
+            target.push(...segments.map(segment => ({ ...segment })));
+        }
+
+        function isWarningParagraph(value, language) {
+            const normalized = normalizedLabel(value);
+            return (WARNING_TERMS[language] || []).some(pattern => pattern.test(normalized));
+        }
+
+        markers.forEach((marker, markerIndex) => {
+            const nextMarker = markers[markerIndex + 1];
+            const sourceParagraph = paragraphs[marker.paragraphIndex];
+            const sourceRaw = sourceParagraph.segments.map(segment => segment.text).join('');
+            const sameParagraphEnd = nextMarker?.paragraphIndex === marker.paragraphIndex
+                ? nextMarker.start
+                : sourceRaw.length;
+            const segments = [];
+            appendParagraph(segments, sliceSegments(sourceParagraph.segments, marker.start, sameParagraphEnd));
+
+            const ingredientPattern = ingredientHeadingPattern(marker.language);
+            let hasIngredients = ingredientPattern.test(segments.map(segment => segment.text).join(''));
+            let lastParagraphIndex = marker.paragraphIndex;
+            const boundaryParagraph = nextMarker?.paragraphIndex ?? paragraphs.length;
+
+            // Some labels put (XX) + description in one Word paragraph and the
+            // Ingredients line in the next. Extend only until that line is found.
+            for (let paragraphIndex = marker.paragraphIndex + 1;
+                !hasIngredients && paragraphIndex < boundaryParagraph;
+                paragraphIndex += 1) {
+                const candidate = paragraphs[paragraphIndex];
+                appendParagraph(segments, candidate.segments);
+                lastParagraphIndex = paragraphIndex;
+                hasIngredients = ingredientPattern.test(candidate.segments.map(segment => segment.text).join(''));
+            }
+
+            // Keep a separate warning paragraph, but do not absorb a following
+            // nutrition/company paragraph into Ingredients.
+            for (let paragraphIndex = lastParagraphIndex + 1;
+                hasIngredients && paragraphIndex < boundaryParagraph;
+                paragraphIndex += 1) {
+                const candidate = paragraphs[paragraphIndex];
+                const candidateRaw = candidate.segments.map(segment => segment.text).join('');
+                if (!isWarningParagraph(candidateRaw, marker.language)) break;
+                appendParagraph(segments, candidate.segments);
+                lastParagraphIndex = paragraphIndex;
+            }
+
+            if (!segments.length) return;
+            blocks.push({
+                language: marker.language,
+                paragraphIndex: marker.paragraphIndex,
+                paragraph: { text: clean(segments.map(segment => segment.text).join('')), segments }
             });
         });
         return blocks;
+    }
+
+    function inlineNutritionStart(value) {
+        const aliases = Object.values(NUTRITION_HEADING_ALIASES).flat()
+            .sort((left, right) => right.length - left.length)
+            .map(alias => escapeRegExp(alias).replace(/\s+/g, '\\s+'));
+        const headingPattern = new RegExp(
+            `(?:^|[\\r\\n])\\s*(?:${aliases.join('|')})[^\\r\\n]{0,100}\\b100\\s*(?:g|ml)\\b`,
+            'i'
+        );
+        const match = headingPattern.exec(value);
+        if (!match) return -1;
+        return match.index + (/^[\r\n]/.test(match[0]) ? 1 : 0);
     }
 
     function trailingWarningRange(value, language) {
@@ -413,16 +496,19 @@
         const raw = paragraph.segments.map(segment => segment.text).join('');
         const marker = raw.match(/^\s*[►▶]?\s*\(([A-Z]{2})\)\s*/i);
         if (!marker || marker[1].toUpperCase() !== language) throw new Error(`Khối ${language} không hợp lệ.`);
-        const ingredientHeading = INGREDIENT_HEADINGS[language];
-        const headingPattern = new RegExp(`${escapeRegExp(ingredientHeading)}\\s*:`, 'i');
+        const headingPattern = ingredientHeadingPattern(language);
         const afterMarker = raw.slice(marker[0].length);
         const headingMatch = headingPattern.exec(afterMarker);
         if (!headingMatch) throw new Error(`Không tìm thấy tiêu đề thành phần trong khối ${language}.`);
         const headingStart = marker[0].length + headingMatch.index;
         const ingredientStart = headingStart + headingMatch[0].length;
         let description = clean(raw.slice(marker[0].length, headingStart));
-        const warningRange = trailingWarningRange(raw.slice(ingredientStart), language);
-        const ingredientEnd = warningRange ? ingredientStart + warningRange.start : raw.length;
+        const remaining = raw.slice(ingredientStart);
+        const nutritionStart = inlineNutritionStart(remaining);
+        const contentEnd = nutritionStart >= 0 ? ingredientStart + nutritionStart : raw.length;
+        const ingredientAndWarning = raw.slice(ingredientStart, contentEnd);
+        const warningRange = trailingWarningRange(ingredientAndWarning, language);
+        const ingredientEnd = warningRange ? ingredientStart + warningRange.start : contentEnd;
         let ingredientSegments = sliceSegments(paragraph.segments, ingredientStart, ingredientEnd);
         const warningSegments = warningRange
             ? sliceSegments(paragraph.segments, ingredientStart + warningRange.start, ingredientStart + warningRange.end)
@@ -438,37 +524,78 @@
         return {
             language,
             description,
-            ingredientHeading: `${ingredientHeading}:`,
+            ingredientHeading: `${clean(headingMatch[1])}:`,
             ingredientSegments,
             warningText
         };
     }
 
     function findNutritionTable(tables) {
-        return tables.find(rows => rows.length >= 2 && rows[0] && rows[0].length >= 2 && /100\s*g/i.test(rows[0][1].text));
+        return tables.find(rows => rows.length >= 2 && rows.some(row =>
+            row.some(cell => /100\s*(?:g|ml)/i.test(clean(cell.text)))
+        ));
+    }
+
+    function parseInlineNutritionParagraph(paragraph, language = '') {
+        const raw = paragraph.segments.map(segment => segment.text).join('');
+        const marker = raw.match(/^\s*[►▶]?\s*\(([A-Z]{2})\)\s*/i);
+        const body = marker ? raw.slice(marker[0].length) : raw;
+        const aliases = (language
+            ? (NUTRITION_HEADING_ALIASES[language] || [])
+            : Object.values(NUTRITION_HEADING_ALIASES).flat())
+            .sort((left, right) => right.length - left.length);
+        if (!aliases.length) return null;
+        const perMatch = /(?:\s+(?:per|pour|pro|für|na|por|pr)\s+)?100\s*(g|ml)(?:\s*[-–]\s*[\p{L}]+)?(?:\s*[:.]\s*|\s+)/iu.exec(body);
+        if (!perMatch) return null;
+
+        const headingPrefix = body.slice(0, perMatch.index);
+        const headingMatches = aliases.map(alias => {
+            const pattern = new RegExp(escapeRegExp(alias).replace(/\s+/g, '\\s+'), 'i');
+            const match = pattern.exec(headingPrefix);
+            return match ? { index: match.index, text: match[0] } : null;
+        }).filter(Boolean).sort((left, right) => left.index - right.index);
+        if (!headingMatches.length) return null;
+        const headingSource = language
+            ? clean(headingMatches[0].text)
+            : clean(headingPrefix.slice(headingMatches[0].index));
+        const metricSource = body.slice(perMatch.index + perMatch[0].length);
+            const rows = [[{ text: headingSource }, { text: `Per 100 ${perMatch[1].toLowerCase()}` }]];
+            const valuePattern = /(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kJ\s*\/\s*(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kcal|(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*(?:kcal|kJ|g|mg|µg|mcg|%)/gi;
+            let cursor = 0;
+            let valueMatch;
+            while ((valueMatch = valuePattern.exec(metricSource)) !== null) {
+                // Inline labels commonly use commas (including decimal commas), not
+                // semicolons. Read the text between consecutive numeric values so
+                // each label is preserved exactly as written in Word.
+                const label = clean(metricSource.slice(cursor, valueMatch.index))
+                    .replace(/^[\s,;:.–—-]+/, '')
+                    .replace(/[\s:]+$/, '');
+                const value = clean(valueMatch[0]);
+                if (label && value) rows.push([{ text: label }, { text: value }]);
+                cursor = valuePattern.lastIndex;
+            }
+        return rows.length >= 2 ? rows : null;
+    }
+
+    function findInlineNutritionByLanguage(paragraphs) {
+        const result = Object.create(null);
+        for (const paragraph of paragraphs) {
+            const raw = paragraph.segments.map(segment => segment.text).join('');
+            const marker = raw.match(/^\s*[►▶]?\s*\(([A-Z]{2})\)\s*/i);
+            const language = marker?.[1]?.toUpperCase();
+            if (!language || !LANGUAGES.includes(language) || result[language]) continue;
+            const rows = parseInlineNutritionParagraph(paragraph, language);
+            if (rows) result[language] = rows;
+        }
+        return result;
     }
 
     function findInlineNutrition(paragraphs) {
-        const headingAliases = Object.values(NUTRITION_HEADING_ALIASES).flat().map(normalizedLabel);
         for (const paragraph of paragraphs) {
             const raw = paragraph.segments.map(segment => segment.text).join('');
-            const perMatch = /(?:\s+(?:per|pour|pro|na|por|pr)\s+)?100\s*g\s*:\s*/i.exec(raw);
-            if (!perMatch) continue;
-            const headingSource = clean(raw.slice(0, perMatch.index));
-            const normalizedHeading = normalizedLabel(headingSource);
-            if (!headingAliases.some(alias => normalizedHeading.includes(alias))) continue;
-
-            const metricSource = raw.slice(perMatch.index + perMatch[0].length);
-            const chunks = metricSource.split(';').map(clean).filter(Boolean);
-            const rows = [[{ text: headingSource }, { text: 'Per 100g' }]];
-            for (const chunk of chunks) {
-                const valueMatch = chunk.match(/((?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kJ\s*\/\s*(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kcal|(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*(?:g|mg|µg|mcg|%))\s*\.?\s*$/i);
-                if (!valueMatch) continue;
-                const label = clean(chunk.slice(0, valueMatch.index));
-                const value = clean(valueMatch[1]);
-                if (label && value) rows.push([{ text: label }, { text: value }]);
-            }
-            if (rows.length >= 2) return rows;
+            if (/^\s*[►▶]?\s*\([A-Z]{2}\)\s*/i.test(raw)) continue;
+            const rows = parseInlineNutritionParagraph(paragraph);
+            if (rows) return rows;
         }
         return null;
     }
@@ -488,14 +615,62 @@
         if (variants.length === languages.length && variants[languageIndex]) {
             return variants[languageIndex];
         }
+        // Some supplier tables list a new nutrient in fewer languages than the
+        // rest of the table. Keep the first label exactly as written in Word
+        // instead of rejecting the whole product or inventing a translation.
+        if (variants[0]) return variants[0];
         throw new Error(`Không xác định được nhãn ${context} cho ${language} từ bảng Word.`);
     }
 
+    function parseDocumentNutrition(doc, languages) {
+        const table = findNutritionTable(doc.tables);
+        if (table) return { shared: parseNutrition(table, languages), byLanguage: Object.create(null) };
+
+        const localizedSources = findInlineNutritionByLanguage(doc.paragraphs);
+        const byLanguage = Object.create(null);
+        for (const language of languages) {
+            if (!localizedSources[language]) continue;
+            byLanguage[language] = parseNutrition(localizedSources[language], [language]);
+        }
+        if (Object.keys(byLanguage).length) return { shared: null, byLanguage };
+
+        const inline = findInlineNutrition(doc.paragraphs);
+        if (inline) return { shared: parseNutrition(inline, languages), byLanguage: Object.create(null) };
+        return null;
+    }
+
     function parseNutrition(table, languages) {
-        if (!table) throw new Error('Không tìm thấy NTF dùng chung có mốc 100g trong bảng hoặc đoạn văn.');
-        const dataRows = table.slice(1).filter(row => row.length >= 2 && clean(row[1].text));
+        if (!table) throw new Error('Không tìm thấy NTF dùng chung có mốc 100 g hoặc 100 ml trong bảng/đoạn văn.');
+        let headerRowIndex = -1;
+        let basisColumnIndex = -1;
+        for (let rowIndex = 0; rowIndex < table.length && headerRowIndex < 0; rowIndex += 1) {
+            const columnIndex = table[rowIndex].findIndex(cell => /100\s*(?:g|ml)/i.test(clean(cell.text)));
+            if (columnIndex >= 0) {
+                headerRowIndex = rowIndex;
+                basisColumnIndex = columnIndex;
+            }
+        }
+        if (headerRowIndex < 0) throw new Error('Không tìm thấy mốc 100 g hoặc 100 ml trong bảng NTF.');
+
+        const headerRow = table[headerRowIndex];
+        const headingAliases = Object.values(NUTRITION_HEADING_ALIASES).flat().map(normalizedLabel);
+        const headingCell = headerRow.find(cell => {
+            const normalized = normalizedLabel(cell.text);
+            return headingAliases.some(alias => normalized.includes(alias));
+        }) || headerRow.find((_cell, index) => index !== basisColumnIndex && clean(_cell.text));
+        const headingSource = clean(headingCell?.text);
+        if (!headingSource) throw new Error('Không tìm thấy tiêu đề NTF trong bảng Word.');
+
+        const candidateRows = table.slice(headerRowIndex + 1).filter(row => clean(row[0]?.text));
+        const valueColumnIndexes = [];
+        const widestRow = Math.max(0, ...candidateRows.map(row => row.length));
+        for (let columnIndex = 1; columnIndex < widestRow; columnIndex += 1) {
+            if (candidateRows.some(row => /\d/.test(clean(row[columnIndex]?.text)))) valueColumnIndexes.push(columnIndex);
+        }
+        if (!valueColumnIndexes.length) throw new Error('Bảng NTF không có chỉ tiêu nào có dữ liệu.');
+
+        const dataRows = candidateRows.filter(row => valueColumnIndexes.some(columnIndex => clean(row[columnIndex]?.text)));
         if (!dataRows.length) throw new Error('Bảng NTF không có chỉ tiêu nào có dữ liệu.');
-        const headingSource = clean(table[0][0].text);
         const headingLabels = Object.create(null);
         languages.forEach((language, index) => {
             headingLabels[language] = resolveSourceLabel(
@@ -503,8 +678,10 @@
             );
         });
         const metrics = dataRows.map((row, rowIndex) => {
-            const value = clean(row[1].text).replace(/\s*\/\s*/g, ' / ');
-            if (!/\d/.test(value)) throw new Error(`Giá trị NTF dòng ${rowIndex + 1} không hợp lệ.`);
+            const values = valueColumnIndexes.map(columnIndex =>
+                clean(row[columnIndex]?.text).replace(/\s*\/\s*/g, ' / ')
+            );
+            if (!values.some(value => /\d/.test(value))) throw new Error(`Giá trị NTF dòng ${rowIndex + 1} không hợp lệ.`);
             const sourceLabel = clean(row[0].text);
             if (!sourceLabel) throw new Error(`Nhãn NTF dòng ${rowIndex + 1} đang trống.`);
             const labels = Object.create(null);
@@ -513,9 +690,26 @@
                     sourceLabel, language, NUTRIENT_ALIASES, languages, languageIndex, `NTF dòng ${rowIndex + 1}`
                 );
             });
-            return { value, sourceLabel, labels };
+            return { value: values[0] || '', values, sourceLabel, labels };
         });
-        return { headingLabels, metrics };
+        const basisMatch = clean(headerRow[basisColumnIndex]?.text).match(/100\s*(g|ml)/i);
+
+        let flavors = [];
+        if (valueColumnIndexes.length > 1) {
+            for (let rowIndex = headerRowIndex - 1; rowIndex >= 0; rowIndex -= 1) {
+                const labels = valueColumnIndexes.map(columnIndex => clean(table[rowIndex]?.[columnIndex]?.text));
+                if (labels.every(Boolean)) {
+                    flavors = labels;
+                    break;
+                }
+            }
+        }
+        return {
+            headingLabels,
+            metrics,
+            basis: basisMatch ? basisMatch[1].toLowerCase() : 'g',
+            flavors
+        };
     }
 
     function isSubItem(label) {
@@ -544,14 +738,31 @@
     }
 
     function buildLanguageHtml(block, nutrition, companyMode = 'importer') {
-        const metrics = nutrition.metrics.map(metric => ({ label: metric.labels[block.language], value: metric.value }));
+        const metrics = nutrition.metrics.map(metric => ({
+            label: metric.labels[block.language],
+            value: metric.value,
+            values: metric.values || [metric.value]
+        }));
         const lines = [
             `<p><i>(${block.language}) ${escapeHtml(block.description)}</i></p>`,
             `<p><b>${escapeHtml(block.ingredientHeading)}</b> ${formatSegments(block.ingredientSegments)}</p>`
         ];
         if (block.warningText) lines.push(`<p><b>${escapeHtml(block.warningText)}</b></p>`);
-        const heading = NUTRITION_HEADINGS[block.language];
-        if (block.language === 'EN' || block.language === 'CZ') {
+        const heading = NUTRITION_HEADINGS[block.language].replace(/100g\b/i, nutrition.basis === 'ml' ? '100 ml' : '100g');
+        if (nutrition.flavors?.length > 1) {
+            lines.push(`<p><b>${escapeHtml(heading)}:</b></p>`);
+            const headerCells = nutrition.flavors.map(flavor => `<th style="border: 1px solid #888; padding: 4px;">${escapeHtml(flavor)}</th>`).join('');
+            const bodyRows = metrics.map(metric => {
+                const valueCells = metric.values.map(value => `<td style="border: 1px solid #888; padding: 4px;">${escapeHtml(value)}</td>`).join('');
+                return `<tr><th style="border: 1px solid #888; padding: 4px; text-align: left;">${escapeHtml(metric.label)}</th>${valueCells}</tr>`;
+            }).join('');
+            lines.push(`<table style="border-collapse: collapse;"><thead><tr><th style="border: 1px solid #888; padding: 4px;"></th>${headerCells}</tr></thead><tbody>${bodyRows}</tbody></table>`);
+            if (block.language === 'EN' || block.language === 'CZ') {
+                const storage = STORAGE[block.language];
+                lines.push(`<p><strong>${escapeHtml(storage[0])}</strong></p>`);
+                lines.push(`<p><span>${escapeHtml(storage[1])}</span></p>`);
+            }
+        } else if (block.language === 'EN' || block.language === 'CZ') {
             lines.push(`<p><b>${escapeHtml(heading)}:</b></p>`);
             metrics.forEach(metric => {
                 const text = `${metric.label}: ${metric.value}`;
@@ -577,30 +788,77 @@
         return match ? match[1] : '';
     }
 
-    async function convertFile(file, id, companyMode = 'importer') {
+    async function inspectFile(file) {
         const doc = await readDocx(file);
         const blocks = languageBlocks(doc.paragraphs);
-        if (!blocks.length) throw new Error('Không tìm thấy khối ngôn ngữ dạng (EN), (FR), (DE)...');
-        const firstMarkerIndex = blocks[0].paragraphIndex;
+        const firstMarkerIndex = blocks[0]?.paragraphIndex ?? doc.paragraphs.length;
         const titleParagraph = doc.paragraphs.slice(0, firstMarkerIndex).find(paragraph => paragraph.text);
         const name = clean(titleParagraph ? titleParagraph.text : file.name.replace(/\.docx$/i, ''));
         if (!name) throw new Error('Không tìm thấy tên sản phẩm.');
+        const contentLanguages = blocks.filter(block => {
+            try {
+                parseLanguageParagraph(block.paragraph, block.language);
+                return true;
+            } catch (_error) {
+                return false;
+            }
+        }).map(block => block.language);
+        return { doc, blocks, contentLanguages, name, defaultCode: optionalCode(file.name) };
+    }
+
+    async function convertFile(file, id, companyMode = 'importer', inspection = null, nutritionFallbacks = []) {
+        const inspected = inspection || await inspectFile(file);
+        const { doc, blocks, name } = inspected;
+        if (!blocks.length) throw new Error('Không tìm thấy khối ngôn ngữ dạng (EN), (FR), (DE)...');
         const detectedLanguages = [...new Set(blocks.map(block => block.language))];
-        const nutritionSource = findNutritionTable(doc.tables) || findInlineNutrition(doc.paragraphs);
-        const nutrition = parseNutrition(nutritionSource, detectedLanguages);
+        let nutritionBundle = parseDocumentNutrition(doc, detectedLanguages);
+        let nutritionFallback = null;
+        if (!nutritionBundle) {
+            let fallbackError = null;
+            for (const candidate of nutritionFallbacks) {
+                const candidateDoc = candidate?.inspection?.doc || candidate?.doc;
+                if (!candidateDoc) continue;
+                try {
+                    const candidateBundle = parseDocumentNutrition(candidateDoc, detectedLanguages);
+                    if (!candidateBundle) continue;
+                    nutritionBundle = candidateBundle;
+                    nutritionFallback = candidate;
+                    break;
+                } catch (error) {
+                    fallbackError = error;
+                }
+            }
+            if (!nutritionBundle) {
+                if (fallbackError) throw fallbackError;
+                parseNutrition(null, detectedLanguages);
+            }
+        }
         const htmlByLanguage = Object.create(null);
         const warnings = [];
+        if (nutritionFallback) {
+            warnings.push(`NTF lấy từ bản cũ gần nhất: ${nutritionFallback.sourcePath || nutritionFallback.fileName || 'DOCX cũ'}.`);
+        }
+        let firstBlockError = null;
         for (const blockData of blocks) {
             if (htmlByLanguage[blockData.language]) {
                 warnings.push(`Bỏ qua khối ${blockData.language} bị lặp.`);
                 continue;
             }
-            const block = parseLanguageParagraph(blockData.paragraph, blockData.language);
-            htmlByLanguage[blockData.language] = buildLanguageHtml(block, nutrition, companyMode);
+            try {
+                const block = parseLanguageParagraph(blockData.paragraph, blockData.language);
+                const nutrition = nutritionBundle.byLanguage?.[blockData.language] || nutritionBundle.shared;
+                if (!nutrition) throw new Error(`Không tìm thấy NTF cho ngôn ngữ ${blockData.language} trong Word.`);
+                htmlByLanguage[blockData.language] = buildLanguageHtml(block, nutrition, companyMode);
+            } catch (error) {
+                firstBlockError ||= error;
+                warnings.push(`Bỏ qua khối ${blockData.language}: ${error.message || error}`);
+            }
         }
+        if (!Object.keys(htmlByLanguage).length && firstBlockError) throw firstBlockError;
         return {
-            id, file, fileName: file.name, name, defaultCode: optionalCode(file.name),
+            id, file, fileName: file.name, name, defaultCode: inspected.defaultCode,
             languages: Object.keys(htmlByLanguage), htmlByLanguage, warnings,
+            nutritionFallbackPath: nutritionFallback?.sourcePath || nutritionFallback?.fileName || '',
             companyMode,
             status: 'success', detail: `Đã tách ${Object.keys(htmlByLanguage).length} ngôn ngữ — ${companyMode === 'seller' ? 'Seller' : 'Importer'}`
         };
@@ -992,6 +1250,6 @@
         reset();
     }
 
-    window.importLabelsTool = { convertFile, parseLanguageParagraph, parseNutrition, buildLanguageHtml };
+    window.importLabelsTool = { inspectFile, convertFile, parseLanguageParagraph, parseNutrition, buildLanguageHtml };
     document.addEventListener('DOMContentLoaded', init);
 })();

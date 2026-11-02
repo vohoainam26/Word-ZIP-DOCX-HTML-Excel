@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="word_zip_multilang.js?v=20261102-1"></script>
+    <script src="word_zip_multilang.js?v=20261102-2"></script>
     <style>
         :root {
             --bg: #f3f6fb;
@@ -633,6 +633,74 @@
             color: var(--text);
         }
 
+        .odoo-control-grid {
+            display: grid;
+            grid-template-columns: minmax(280px, 1fr) minmax(220px, 0.7fr);
+            gap: 14px;
+            margin-top: 16px;
+        }
+
+        .odoo-control-card {
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--surface-soft);
+        }
+
+        .odoo-control-card label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+
+        .odoo-select,
+        .odoo-match-select {
+            width: 100%;
+            min-height: 40px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #fff;
+            color: var(--text);
+            font: inherit;
+        }
+
+        .odoo-file-meta,
+        .odoo-match-note,
+        .odoo-missing {
+            margin-top: 7px;
+            color: var(--muted);
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+
+        .odoo-missing {
+            color: var(--danger);
+            font-weight: 700;
+        }
+
+        .coverage-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: var(--success-soft);
+            color: var(--success);
+            font-size: 0.83rem;
+            font-weight: 800;
+        }
+
+        .coverage-badge.incomplete {
+            background: var(--warning-soft);
+            color: var(--warning);
+        }
+
+        .odoo-approve input {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--success);
+        }
+
         @media (max-width: 900px) {
             .hero,
             .review-panel,
@@ -647,6 +715,10 @@
             }
 
             .upload-zone {
+                grid-template-columns: 1fr;
+            }
+
+            .odoo-control-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -695,6 +767,7 @@
         <nav class="tool-tabs" aria-label="Chọn chức năng">
             <button class="tool-tab active" type="button" data-tool-tab="summary">Summary Labels</button>
             <button class="tool-tab" type="button" data-tool-tab="import">IMPORT LABELS</button>
+            <button class="tool-tab" type="button" data-tool-tab="odoo">ODOO FILL</button>
         </nav>
 
         <div class="tool-view" data-tool-view="summary">
@@ -871,6 +944,97 @@
                 </div>
             </section>
         </div>
+
+        <div class="tool-view" data-tool-view="odoo" hidden>
+            <section class="panel" aria-labelledby="odoo-upload-title">
+                <div class="panel-heading">
+                    <div>
+                        <h2 id="odoo-upload-title">1. Chọn file Odoo đang làm việc</h2>
+                        <p>Chọn một lần và ghi trực tiếp vào chính file này sau mỗi lượt duyệt Daily hoặc Import.</p>
+                    </div>
+                </div>
+
+                <div class="odoo-control-grid">
+                    <div class="odoo-control-card">
+                        <label>File Excel Odoo đang làm việc</label>
+                        <button class="btn btn-primary" id="odoo-workbook-button" type="button">Chọn file Odoo đang làm việc</button>
+                        <div class="odoo-file-meta" id="odoo-workbook-meta">Chưa chọn file Excel. Chrome/Edge sẽ yêu cầu quyền đọc và ghi file.</div>
+                    </div>
+                    <div class="odoo-control-card">
+                        <label>Cách lưu qua nhiều lượt</label>
+                        <div class="odoo-file-meta" id="odoo-working-note">Daily có thể lưu trước dù chưa đủ 15 ngôn ngữ. Lượt Import tiếp theo sẽ đọc dữ liệu đã lưu và bổ sung các ô còn thiếu.</div>
+                    </div>
+                </div>
+
+                <div class="upload-zone" style="margin-top: 16px;">
+                    <div class="upload-copy">
+                        <strong>Chọn ZIP hoặc DOCX chứa dữ liệu nhãn</strong>
+                        <span>Tự nhận dạng Summary Labels và IMPORT LABELS. ZIP được quét toàn bộ thư mục con.</span>
+                        <input class="file-input" type="file" id="odoo-source-files" accept=".zip,.docx,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+                    </div>
+                    <div class="actions-row">
+                        <button class="btn btn-secondary" id="odoo-reset-button" type="button">Xóa kết quả</button>
+                        <button class="btn btn-primary" id="odoo-process-button" type="button">Kiểm tra Odoo &amp; chuyển HTML</button>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <strong>Thông tin công ty:</strong>
+                    <label class="checkbox-label"><input type="radio" name="odoo-company-mode" value="importer" checked> Importer</label>
+                    <label class="checkbox-label"><input type="radio" name="odoo-company-mode" value="seller"> Seller</label>
+                    <span style="color: var(--muted);">Chỉ áp dụng cho nguồn IMPORT LABELS và các ngôn ngữ ngoài EN/CZ.</span>
+                </div>
+
+                <p class="import-help"><strong>Quy tắc lọc:</strong> kiểm tra toàn bộ ZIP trước và chỉ chuyển những sản phẩm tìm thấy trong file Odoo. Sản phẩm không có trong Odoo được bỏ qua, không đưa vào báo cáo; sản phẩm đã khớp Odoo nhưng Word lỗi sẽ được báo rõ. Chỉ ghi vào ô ngôn ngữ đang trống; dữ liệu cũ được giữ nguyên.</p>
+
+                <div class="summary-grid" aria-label="Thống kê ODOO FILL">
+                    <div class="summary-card"><span>Sản phẩm có trong Odoo</span><strong id="odoo-count-total">0</strong></div>
+                    <div class="summary-card success"><span>Đủ 15 sau khi gộp</span><strong id="odoo-count-ready">0</strong></div>
+                    <div class="summary-card"><span>Cần kiểm tra</span><strong id="odoo-count-review">0</strong></div>
+                    <div class="summary-card error"><span>Lỗi sản phẩm Odoo</span><strong id="odoo-count-error">0</strong></div>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="odoo-results-title">
+                <div class="panel-heading">
+                    <div>
+                        <h2 id="odoo-results-title">2. Duyệt kết quả trước khi Fill</h2>
+                        <p>Chỉ hiển thị sản phẩm có trong Odoo; kiểm tra số ngôn ngữ và ảnh/HTML trước khi lưu.</p>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 55px;">Duyệt</th>
+                                <th>Sản phẩm từ Word</th>
+                                <th style="width: 130px;">Code</th>
+                                <th>Sản phẩm Odoo</th>
+                                <th style="width: 135px;">Ngôn ngữ</th>
+                                <th>Trạng thái</th>
+                                <th style="width: 110px;">Kết quả</th>
+                            </tr>
+                        </thead>
+                        <tbody id="odoo-results-body">
+                            <tr><td colspan="7" class="empty-state">Chưa có dữ liệu để ghép.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="review-panel" id="odoo-review-panel">
+                    <div>
+                        <h3>Đã quét xong — đang chờ bạn duyệt</h3>
+                        <p id="odoo-review-message">Có thể duyệt và lưu từng phần; dữ liệu đã lưu sẽ được dùng cho lượt tiếp theo.</p>
+                    </div>
+                    <div class="review-actions">
+                        <button class="btn btn-secondary" id="odoo-error-log-button" type="button" disabled>Tải log lỗi (0)</button>
+                        <button class="btn btn-secondary" id="odoo-approve-all-button" type="button" disabled>Duyệt tất cả</button>
+                        <button class="btn btn-success" id="odoo-fill-button" type="button" disabled>Duyệt &amp; Lưu vào file Odoo</button>
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <div class="modal-backdrop" id="preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="preview-title">
@@ -914,6 +1078,29 @@
             <pre id="import-preview-code" hidden></pre>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="import-copy-preview" type="button">Copy HTML</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="odoo-preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="odoo-preview-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="odoo-preview-title">ODOO FILL — Kết quả</h3>
+                <select class="import-language-select" id="odoo-preview-language" aria-label="Chọn ngôn ngữ"></select>
+                <div class="preview-mode-tabs" role="tablist" aria-label="Chế độ xem kết quả ODOO FILL">
+                    <button class="small-btn preview-mode-tab active" id="odoo-preview-visual-tab" type="button" role="tab" aria-selected="true">Ảnh nhãn</button>
+                    <button class="small-btn preview-mode-tab" id="odoo-preview-code-tab" type="button" role="tab" aria-selected="false">Mã HTML</button>
+                </div>
+                <button class="small-btn" id="odoo-close-preview" type="button">Đóng</button>
+            </div>
+            <div class="preview-visual-panel" id="odoo-preview-visual-panel">
+                <p class="preview-status" id="odoo-preview-status">Đang tạo ảnh từ HTML…</p>
+                <div class="label-render-source" id="odoo-preview-rendered"></div>
+                <img class="preview-image" id="odoo-preview-image" alt="Ảnh xem trước ODOO FILL" hidden>
+            </div>
+            <pre id="odoo-preview-code" hidden></pre>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="odoo-copy-preview" type="button">Copy HTML</button>
             </div>
         </div>
     </div>
@@ -1641,13 +1828,15 @@
         window.batchWordTool = {
             parseFileIdentity,
             detectFolderLanguage,
+            convertSummaryItem: convertDocx,
             convertWordExactly,
             buildProductRows,
             convertLanguageBlocks: window.multilingualWordParser.convert,
             parseMetrics: window.multilingualWordParser.parseMetrics
         };
     </script>
-    <script src="import_labels.js?v=20261102-9"></script>
+    <script src="import_labels.js?v=20261102-21"></script>
+    <script src="odoo_fill.js?v=20261102-12"></script>
 </body>
 
 </html>

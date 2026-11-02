@@ -253,7 +253,7 @@
         }
         const stream = buildTextStream(bodyParagraphs);
         const boldGroups = findBoldGroups(stream);
-        const nutritionHeading = boldGroups.find(group => /\b100\b/.test(group.text));
+        const nutritionHeading = boldGroups.find(group => /\b100(?:\s*(?:g|ml))?\b/i.test(group.text));
         if (!nutritionHeading) {
             throw new Error(`Không tìm thấy tiêu đề NTF có mốc 100 trong khối ${block.language}.`);
         }
