@@ -806,9 +806,9 @@
 
                 <div class="upload-zone">
                     <div class="upload-copy">
-                        <strong>Chọn nhiều file DOCX</strong>
-                        <span>default_code không bắt buộc; tên sản phẩm được lấy từ tiêu đề đầu tiên trong Word.</span>
-                        <input class="file-input" type="file" id="import-source-files" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+                        <strong>Chọn nhiều file ZIP hoặc DOCX</strong>
+                        <span>ZIP được quét toàn bộ thư mục con và chỉ lấy DOCX. default_code không bắt buộc.</span>
+                        <input class="file-input" type="file" id="import-source-files" accept=".zip,.docx,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
                     </div>
                     <div class="actions-row">
                         <button class="btn btn-secondary" id="import-reset-button" type="button">Xóa tất cả</button>
@@ -1647,7 +1647,7 @@
             parseMetrics: window.multilingualWordParser.parseMetrics
         };
     </script>
-    <script src="import_labels.js?v=20261102-5"></script>
+    <script src="import_labels.js?v=20261102-6"></script>
 </body>
 
 </html>

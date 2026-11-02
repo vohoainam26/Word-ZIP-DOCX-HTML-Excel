@@ -529,9 +529,12 @@
             const row = document.createElement('tr');
             row.classList.toggle('row-error', item.status === 'error');
             const codeValue = escapeHtml(item.defaultCode || '');
+            const sourceText = item.sourceType === 'zip'
+                ? `ZIP: ${item.sourceName}${item.sourcePath ? ` — ${item.sourcePath}` : ''}`
+                : 'File DOCX tải trực tiếp';
             row.innerHTML = `
                 <td>${index + 1}</td>
-                <td><div class="file-name">${escapeHtml(item.fileName)}</div></td>
+                <td><div class="file-name">${escapeHtml(item.fileName)}</div><div class="source-name">${escapeHtml(sourceText)}</div></td>
                 <td><input class="import-code-input" type="text" value="${codeValue}" placeholder="Không bắt buộc"></td>
                 <td>${escapeHtml(item.name || '—')}</td>
                 <td>${escapeHtml((item.languages || []).join(', ') || '—')}</td>
@@ -565,30 +568,121 @@
         el.exportButton.textContent = `Duyệt & Xuất Excel (${success} dòng)`;
     }
 
+    function basename(path) {
+        return String(path || '').split(/[\\/]/).pop() || '';
+    }
+
+    async function scanImportSources(sourceFiles) {
+        const descriptors = [];
+        const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        for (const sourceFile of sourceFiles) {
+            if (/\.docx$/i.test(sourceFile.name)) {
+                if (/^~\$/i.test(sourceFile.name)) continue;
+                descriptors.push({
+                    file: sourceFile,
+                    fileName: sourceFile.name,
+                    sourceType: 'docx',
+                    sourceName: sourceFile.name,
+                    sourcePath: ''
+                });
+                continue;
+            }
+            if (!/\.zip$/i.test(sourceFile.name)) continue;
+
+            let archive;
+            try {
+                archive = await JSZip.loadAsync(sourceFile);
+            } catch (error) {
+                descriptors.push({
+                    file: null,
+                    fileName: sourceFile.name,
+                    sourceType: 'zip',
+                    sourceName: sourceFile.name,
+                    sourcePath: '',
+                    preError: `Không mở được ZIP: ${error.message}`
+                });
+                continue;
+            }
+
+            const entries = Object.values(archive.files)
+                .filter(entry => !entry.dir)
+                .filter(entry => /\.docx$/i.test(entry.name))
+                .filter(entry => !/(^|\/)__MACOSX\//i.test(entry.name))
+                .filter(entry => !/^~\$/i.test(basename(entry.name)))
+                .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+            if (!entries.length) {
+                descriptors.push({
+                    file: null,
+                    fileName: sourceFile.name,
+                    sourceType: 'zip',
+                    sourceName: sourceFile.name,
+                    sourcePath: '',
+                    preError: 'ZIP không chứa file DOCX.'
+                });
+                continue;
+            }
+
+            entries.forEach(entry => descriptors.push({
+                file: null,
+                entry,
+                fileName: basename(entry.name),
+                sourceType: 'zip',
+                sourceName: sourceFile.name,
+                sourcePath: entry.name,
+                docxMime
+            }));
+        }
+        return descriptors;
+    }
+
     async function processFiles() {
-        const files = [...el.files.files].filter(file => /\.docx$/i.test(file.name));
-        if (!files.length) {
-            alert('Hãy chọn ít nhất một file DOCX.');
+        const sourceFiles = [...el.files.files].filter(file => /\.(zip|docx)$/i.test(file.name));
+        if (!sourceFiles.length) {
+            alert('Hãy chọn ít nhất một file ZIP hoặc DOCX.');
             return;
         }
         state.processing = true;
         state.processed = false;
         state.exported = false;
         state.companyMode = document.querySelector('input[name="import-company-mode"]:checked')?.value || 'importer';
-        state.items = files.map((file, index) => ({
-            id: index + 1, file, fileName: file.name, name: '', defaultCode: optionalCode(file.name),
-            languages: [], htmlByLanguage: Object.create(null), status: 'waiting', detail: 'Đang chờ xử lý'
+        el.processButton.disabled = true;
+        const descriptors = await scanImportSources(sourceFiles);
+        if (!descriptors.length) {
+            state.processing = false;
+            el.processButton.disabled = false;
+            alert('Không tìm thấy file DOCX hợp lệ trong dữ liệu đã chọn.');
+            return;
+        }
+        state.items = descriptors.map((descriptor, index) => ({
+            ...descriptor,
+            id: index + 1,
+            name: '',
+            defaultCode: optionalCode(descriptor.fileName),
+            languages: [],
+            htmlByLanguage: Object.create(null),
+            status: descriptor.preError ? 'error' : 'waiting',
+            detail: descriptor.preError || 'Đang chờ xử lý'
         }));
         renderRows();
         updateSummary();
-        el.processButton.disabled = true;
         for (let index = 0; index < state.items.length; index++) {
             const item = state.items[index];
+            if (item.status === 'error') continue;
             item.status = 'processing';
-            item.detail = 'Đang đọc DOCX';
+            item.detail = item.sourceType === 'zip' ? 'Đang giải nén và đọc DOCX' : 'Đang đọc DOCX';
             renderRows();
             try {
-                state.items[index] = await convertFile(item.file, item.id, state.companyMode);
+                const file = item.file || new File(
+                    [await item.entry.async('blob')],
+                    item.fileName,
+                    { type: item.docxMime, lastModified: Date.now() }
+                );
+                const converted = await convertFile(file, item.id, state.companyMode);
+                converted.sourceType = item.sourceType;
+                converted.sourceName = item.sourceName;
+                converted.sourcePath = item.sourcePath;
+                state.items[index] = converted;
             } catch (error) {
                 item.status = 'error';
                 item.detail = error.message || 'Lỗi không xác định';

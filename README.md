@@ -19,7 +19,8 @@
 
 ## IMPORT LABELS
 
-- Nhận nhiều DOCX, mỗi DOCX có nhiều khối ngôn ngữ và một bảng NTF dùng chung
+- Nhận nhiều ZIP hoặc DOCX lẻ; ZIP được quét toàn bộ thư mục con và chỉ lấy DOCX
+- Mỗi DOCX có nhiều khối ngôn ngữ và một bảng NTF dùng chung
 - Tách từng khối theo mã `(EN)`, `(FR)`, `(DE)`...
 - `default_code` không bắt buộc; tên sản phẩm lấy từ tiêu đề đầu tiên trong Word
 - EN/CZ dùng format cũ, NTF xuống từng dòng và có Storage bắt buộc
