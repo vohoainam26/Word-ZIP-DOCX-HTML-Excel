@@ -8,7 +8,8 @@
     <link rel="icon" href="data:,">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="word_zip_multilang.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="word_zip_multilang.js?v=20261102-1"></script>
     <style>
         :root {
             --bg: #f3f6fb;
@@ -515,6 +516,123 @@
             overflow-wrap: anywhere;
         }
 
+        .preview-mode-tabs {
+            display: flex;
+            gap: 6px;
+            margin-left: auto;
+        }
+
+        .preview-mode-tab.active {
+            border-color: var(--primary);
+            color: #ffffff;
+            background: var(--primary);
+        }
+
+        .preview-visual-panel {
+            flex: 1;
+            min-height: 0;
+            padding: 18px;
+            overflow: auto;
+            background: #eef2f7;
+        }
+
+        .preview-status {
+            margin: 0 0 12px;
+            color: var(--muted);
+            font-size: 0.9rem;
+            text-align: center;
+        }
+
+        .label-render-source,
+        .preview-image {
+            display: block;
+            width: min(760px, 100%);
+            margin: 0 auto;
+            border: 1px solid #d8dee9;
+            background: #ffffff;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        }
+
+        .label-render-source {
+            box-sizing: border-box;
+            padding: 28px 32px;
+            color: #111827;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 16px;
+            line-height: 1.55;
+            overflow-wrap: anywhere;
+        }
+
+        .label-render-source p {
+            margin: 0 0 10px;
+        }
+
+        .label-render-source p:last-child {
+            margin-bottom: 0;
+        }
+
+        .preview-image {
+            height: auto;
+        }
+
+        [hidden] {
+            display: none !important;
+        }
+
+        .tool-tabs {
+            display: flex;
+            gap: 10px;
+            margin: 18px 0;
+            padding: 6px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow);
+        }
+
+        .tool-tab {
+            flex: 1;
+            min-height: 46px;
+            border: 0;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--muted);
+            font: inherit;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .tool-tab.active {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .tool-view > .panel:first-child {
+            margin-top: 0;
+        }
+
+        .import-code-input,
+        .import-language-select {
+            width: 100%;
+            min-height: 38px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #fff;
+            color: var(--text);
+            font: inherit;
+        }
+
+        .import-help {
+            margin-top: 12px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .import-help strong {
+            color: var(--text);
+        }
+
         @media (max-width: 900px) {
             .hero,
             .review-panel,
@@ -569,23 +687,30 @@
         <header class="hero">
             <div>
                 <h1>Word ZIP / DOCX → HTML Excel</h1>
-            <p>Xử lý nhãn đa ngôn ngữ từ file ZIP hoặc DOCX lẻ, theo dõi lỗi từng file và chỉ xuất Excel sau khi bạn duyệt kết quả.</p>
+            <p>Gộp nhãn đa ngôn ngữ từ các thư mục trong ZIP vào một dòng sản phẩm, theo dõi lỗi từng file và chỉ xuất Excel sau khi bạn duyệt.</p>
             </div>
             <div class="hero-badge">Xử lý ngay trên máy</div>
         </header>
+
+        <nav class="tool-tabs" aria-label="Chọn chức năng">
+            <button class="tool-tab active" type="button" data-tool-tab="summary">Summary Labels</button>
+            <button class="tool-tab" type="button" data-tool-tab="import">IMPORT LABELS</button>
+        </nav>
+
+        <div class="tool-view" data-tool-view="summary">
 
         <section class="panel" aria-labelledby="upload-title">
             <div class="panel-heading">
                 <div>
             <h2 id="upload-title">1. Thêm ZIP hoặc DOCX và xử lý</h2>
-                    <p>Chọn ZIP để xử lý hàng loạt hoặc chọn trực tiếp một hay nhiều file .docx.</p>
+                    <p>ZIP có thể chứa các thư mục ngôn ngữ như FR (French), CZ - 7x5 cm, ES &gt; PT. Bạn cũng có thể chọn DOCX lẻ.</p>
                 </div>
             </div>
 
             <div class="upload-zone" id="upload-zone">
                 <div class="upload-copy">
                     <strong>Chọn hoặc kéo thả file ZIP / DOCX</strong>
-                    <span>Hỗ trợ: FR 4087-4..., v0_FR 4087-4... và ES + PT 61103...</span>
+                    <span>Trong ZIP, tên thư mục quyết định ngôn ngữ. DOCX lẻ vẫn đọc mã ngôn ngữ từ tên file.</span>
                     <input class="file-input" type="file" id="source-files" accept=".zip,.docx,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
                 </div>
                 <div class="actions-row">
@@ -668,17 +793,127 @@
                 </div>
             </div>
         </section>
+        </div>
+
+        <div class="tool-view" data-tool-view="import" hidden>
+            <section class="panel" aria-labelledby="import-upload-title">
+                <div class="panel-heading">
+                    <div>
+                        <h2 id="import-upload-title">1. Thêm DOCX đa ngôn ngữ</h2>
+                        <p>Mỗi Word có thể chứa nhiều khối (EN), (FR), (DE)... và một bảng NTF dùng chung. Có thể chọn nhiều DOCX cùng lúc.</p>
+                    </div>
+                </div>
+
+                <div class="upload-zone">
+                    <div class="upload-copy">
+                        <strong>Chọn nhiều file DOCX</strong>
+                        <span>default_code không bắt buộc; tên sản phẩm được lấy từ tiêu đề đầu tiên trong Word.</span>
+                        <input class="file-input" type="file" id="import-source-files" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
+                    </div>
+                    <div class="actions-row">
+                        <button class="btn btn-secondary" id="import-reset-button" type="button">Xóa tất cả</button>
+                        <button class="btn btn-primary" id="import-process-button" type="button">Quét &amp; tách ngôn ngữ</button>
+                    </div>
+                </div>
+
+                <div class="options-row">
+                    <strong>Thông tin công ty:</strong>
+                    <label class="checkbox-label"><input type="radio" name="import-company-mode" value="importer" checked> Importer</label>
+                    <label class="checkbox-label"><input type="radio" name="import-company-mode" value="seller"> Seller</label>
+                    <span style="color: var(--muted);">Áp dụng cho tất cả DOCX trong lần quét.</span>
+                </div>
+
+                <p class="import-help"><strong>Quy tắc:</strong> EN/CZ giữ format cũ và xuống dòng NTF; các ngôn ngữ khác viết NTF liền bằng dấu phẩy. Dữ liệu không chắc chắn sẽ báo lỗi thay vì tự đoán.</p>
+
+                <div class="summary-grid" aria-label="Thống kê IMPORT LABELS">
+                    <div class="summary-card"><span>Tổng DOCX</span><strong id="import-count-total">0</strong></div>
+                    <div class="summary-card success"><span>Hoàn thành</span><strong id="import-count-success">0</strong></div>
+                    <div class="summary-card error"><span>Lỗi</span><strong id="import-count-error">0</strong></div>
+                </div>
+            </section>
+
+            <section class="panel" aria-labelledby="import-tracking-title">
+                <div class="panel-heading">
+                    <div>
+                        <h2 id="import-tracking-title">2. Kiểm tra kết quả từng file</h2>
+                        <p>Kiểm tra tên, ngôn ngữ phát hiện và HTML trước khi duyệt xuất Excel.</p>
+                    </div>
+                </div>
+
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 55px;">#</th>
+                                <th>File DOCX</th>
+                                <th style="width: 160px;">default_code</th>
+                                <th>Tên sản phẩm</th>
+                                <th style="width: 190px;">Ngôn ngữ</th>
+                                <th style="width: 145px;">Trạng thái</th>
+                                <th>Chi tiết / nguyên nhân lỗi</th>
+                                <th style="width: 110px;">HTML</th>
+                            </tr>
+                        </thead>
+                        <tbody id="import-results-body">
+                            <tr><td colspan="8" class="empty-state">Chưa có file DOCX nào được quét.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="review-panel" id="import-review-panel">
+                    <div>
+                        <h3>Đã xử lý xong — đang chờ bạn duyệt</h3>
+                        <p id="import-review-message">Kiểm tra kết quả trước khi tạo Excel.</p>
+                    </div>
+                    <div class="review-actions">
+                        <button class="btn btn-success" id="import-export-button" type="button" disabled>Duyệt &amp; Xuất Excel</button>
+                    </div>
+                </div>
+            </section>
+        </div>
     </main>
 
     <div class="modal-backdrop" id="preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="preview-title">
         <div class="modal">
             <div class="modal-header">
-                <h3 id="preview-title">HTML đã định dạng</h3>
+                <h3 id="preview-title">Kết quả nhãn</h3>
+                <div class="preview-mode-tabs" role="tablist" aria-label="Chế độ xem kết quả">
+                    <button class="small-btn preview-mode-tab active" id="preview-visual-tab" type="button" role="tab" aria-selected="true">Ảnh nhãn</button>
+                    <button class="small-btn preview-mode-tab" id="preview-code-tab" type="button" role="tab" aria-selected="false">Mã HTML</button>
+                </div>
                 <button class="small-btn" id="close-preview" type="button">Đóng</button>
             </div>
-            <pre id="preview-code"></pre>
+            <div class="preview-visual-panel" id="preview-visual-panel">
+                <p class="preview-status" id="preview-status">Đang tạo ảnh từ HTML…</p>
+                <div class="label-render-source" id="preview-rendered"></div>
+                <img class="preview-image" id="preview-image" alt="Ảnh xem trước nhãn" hidden>
+            </div>
+            <pre id="preview-code" hidden></pre>
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="copy-preview" type="button">Copy HTML</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="import-preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="import-preview-title">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="import-preview-title">IMPORT LABELS — Kết quả</h3>
+                <select class="import-language-select" id="import-preview-language" aria-label="Chọn ngôn ngữ"></select>
+                <div class="preview-mode-tabs" role="tablist" aria-label="Chế độ xem kết quả IMPORT LABELS">
+                    <button class="small-btn preview-mode-tab active" id="import-preview-visual-tab" type="button" role="tab" aria-selected="true">Ảnh nhãn</button>
+                    <button class="small-btn preview-mode-tab" id="import-preview-code-tab" type="button" role="tab" aria-selected="false">Mã HTML</button>
+                </div>
+                <button class="small-btn" id="import-close-preview" type="button">Đóng</button>
+            </div>
+            <div class="preview-visual-panel" id="import-preview-visual-panel">
+                <p class="preview-status" id="import-preview-status">Đang tạo ảnh từ HTML…</p>
+                <div class="label-render-source" id="import-preview-rendered"></div>
+                <img class="preview-image" id="import-preview-image" alt="Ảnh xem trước nhãn IMPORT LABELS" hidden>
+            </div>
+            <pre id="import-preview-code" hidden></pre>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="import-copy-preview" type="button">Copy HTML</button>
             </div>
         </div>
     </div>
@@ -691,7 +926,9 @@
             processing: false,
             processed: false,
             exported: false,
-            currentPreviewId: null
+            currentPreviewId: null,
+            previewMode: 'visual',
+            previewImageUrl: ''
         };
 
         const elements = {
@@ -712,6 +949,12 @@
             previewBackdrop: document.getElementById('preview-backdrop'),
             previewTitle: document.getElementById('preview-title'),
             previewCode: document.getElementById('preview-code'),
+            previewVisualPanel: document.getElementById('preview-visual-panel'),
+            previewRendered: document.getElementById('preview-rendered'),
+            previewImage: document.getElementById('preview-image'),
+            previewStatus: document.getElementById('preview-status'),
+            previewVisualTab: document.getElementById('preview-visual-tab'),
+            previewCodeTab: document.getElementById('preview-code-tab'),
             closePreview: document.getElementById('close-preview'),
             copyPreview: document.getElementById('copy-preview')
         };
@@ -722,6 +965,11 @@
             success: { label: 'Hoàn thành', icon: '✓' },
             error: { label: 'Lỗi', icon: '!' }
         };
+
+        const LANGUAGE_COLUMNS = [
+            'EN', 'FR', 'DE', 'CZ', 'PL', 'HU', 'ES', 'PT', 'IT',
+            'RO', 'SK', 'NL', 'DK', 'FI', 'SE', 'EE', 'ES > PT'
+        ];
 
         function cleanText(value) {
             return String(value || '')
@@ -749,12 +997,33 @@
             'IT', 'RO', 'SK', 'NL', 'DK', 'FI', 'SE', 'EE'
         ]);
 
+        function detectFolderLanguage(entryName) {
+            const folders = String(entryName || '').split('/').slice(0, -1).filter(Boolean);
+            for (let index = folders.length - 1; index >= 0; index--) {
+                const folderName = folders[index].trim();
+                const normalized = folderName.toUpperCase();
+                if (/^ES\s*(?:>|\+)\s*PT(?=\b|\s|[-_(])/i.test(normalized)) {
+                    return { language: 'ES > PT', folderName, czRank: 0 };
+                }
+                const match = normalized.match(/^(EN|FR|DE|CZ|PL|HU|ES|PT|IT|RO|SK|NL|DK|FI|SE|EE)(?=\b|\s|[-_(])/i);
+                if (!match) continue;
+                const language = match[1].toUpperCase();
+                let czRank = 0;
+                if (language === 'CZ') {
+                    if (/7\s*[X×]\s*5/i.test(folderName)) czRank = 2;
+                    else if (/5\s*[X×]\s*3/i.test(folderName)) czRank = 1;
+                }
+                return { language, folderName, czRank };
+            }
+            return null;
+        }
+
         function parseFileIdentity(fileName) {
             const stem = basename(fileName).replace(/\.docx$/i, '').trim();
             const identityStem = stem.replace(/^v\d+_/i, '');
-            const match = identityStem.match(/^([A-Z]{2})(?:\s*([+>])\s*([A-Z]{2}))?\s+(\d+(?:-\d+)?)(?=[\s_]|$)/i);
+            const match = identityStem.match(/(?:^|[_\s-])([A-Z]{2})(?:\s*([+>])\s*([A-Z]{2}))?[\s_]+(\d+(?:-\d+)?)(?=[\s_]|$)/i);
             if (!match) {
-                throw new Error('Tên file phải theo dạng “FR 4087-4 ...”, “v0_FR 4087-4 ...”, “EN 7170 ...” hoặc “ES + PT 61103 ...”.');
+                throw new Error('Không tìm thấy mã nước và mã sản phẩm trong tên file. Ví dụ: “CZ 58602 ...”, “5x3 cm_CZ 58602 ...” hoặc “ES + PT 61103 ...”.');
             }
             const languages = [match[1].toUpperCase()];
             if (match[3]) languages.push(match[3].toUpperCase());
@@ -763,7 +1032,7 @@
                 throw new Error(`Mã ngôn ngữ chưa hỗ trợ: ${unsupported.join(', ')}.`);
             }
             const productName = identityStem
-                .slice(match[0].length)
+                .slice(match.index + match[0].length)
                 .replace(/^[\s_]+/, '')
                 .trim();
             return {
@@ -816,7 +1085,8 @@
                     segments.push({
                         text,
                         bold: runPropertyEnabled(run, 'b') || runPropertyEnabled(run, 'bCs'),
-                        italic: runPropertyEnabled(run, 'i') || runPropertyEnabled(run, 'iCs')
+                        italic: runPropertyEnabled(run, 'i') || runPropertyEnabled(run, 'iCs'),
+                        underline: runPropertyEnabled(run, 'u')
                     });
                 }
                 const text = cleanText(segments.map(segment => segment.text).join(''));
@@ -825,18 +1095,62 @@
             return paragraphs;
         }
 
+        function formatExactSegment(segment) {
+            let content = escapeHtml(String(segment.text || '')
+                .replace(/\u00a0/g, ' ')
+                .replace(/\t/g, ' '))
+                .replace(/\r?\n/g, '<br>');
+            if (!content) return '';
+            if (!segment.bold && !segment.italic && !segment.underline) {
+                return `<span style="font-weight: 400;">${content}</span>`;
+            }
+            if (segment.underline) content = `<u>${content}</u>`;
+            if (segment.italic) content = `<i>${content}</i>`;
+            if (segment.bold) content = `<b>${content}</b>`;
+            return content;
+        }
+
+        function convertWordExactly(paragraphs) {
+            if (!paragraphs.length) throw new Error('Không tìm thấy nội dung văn bản trong DOCX.');
+            return paragraphs.map(paragraph => {
+                const segments = [];
+                for (const segment of paragraph.segments) {
+                    const previous = segments[segments.length - 1];
+                    if (previous && previous.bold === segment.bold && previous.italic === segment.italic && previous.underline === segment.underline) {
+                        previous.text += segment.text;
+                    } else {
+                        segments.push({ ...segment });
+                    }
+                }
+                const html = segments.map(formatExactSegment).join('');
+                return `<p>${html}</p>`;
+            }).join('\n');
+        }
+
+        function identityOutputLanguage(identity) {
+            return identity.languages.length > 1 ? 'ES > PT' : identity.languages[0];
+        }
+
         async function convertDocx(item) {
             const identity = parseFileIdentity(item.fileName);
             item.productCode = identity.productCode;
             item.productName = identity.productName;
+            item.outputLanguage = item.outputLanguage || identityOutputLanguage(identity);
             const bytes = item.entry
                 ? await item.entry.async('uint8array')
                 : new Uint8Array(await item.file.arrayBuffer());
             const paragraphs = await readDocxParagraphs(bytes);
-            const result = window.multilingualWordParser.convert(identity, paragraphs);
-            if (result.html.length > 32700) throw new Error('HTML vượt giới hạn ký tự của một ô Excel.');
-            item.languages = result.languages;
-            return result.html;
+            let html;
+            if (item.outputLanguage === 'EN' || item.outputLanguage === 'CZ') {
+                const result = window.multilingualWordParser.convert({ ...identity, languages: [item.outputLanguage] }, paragraphs);
+                item.languages = result.languages;
+                html = result.html;
+            } else {
+                item.languages = item.outputLanguage === 'ES > PT' ? ['ES', 'PT'] : [item.outputLanguage];
+                html = convertWordExactly(paragraphs);
+            }
+            if (html.length > 32700) throw new Error('HTML vượt giới hạn ký tự của một ô Excel.');
+            return html;
         }
 
         function createItemRow(item) {
@@ -865,7 +1179,7 @@
             row.querySelector('.index-cell').textContent = String(item.index + 1);
             row.querySelector('.file-name').textContent = item.fileName;
             row.querySelector('.source-name').textContent = item.sourceType === 'zip'
-                ? `ZIP: ${item.sourceName}`
+                ? `ZIP: ${item.sourceName}${item.folderName ? ` — ${item.folderName}` : ''}`
                 : 'File DOCX tải trực tiếp';
             row.querySelector('.code-cell').textContent = item.productCode || '—';
             row.querySelector('.status-cell').innerHTML = `<span class="status-badge status-${item.status}">${statusMeta.icon} ${statusMeta.label}</span>`;
@@ -879,7 +1193,7 @@
                 const previewButton = document.createElement('button');
                 previewButton.type = 'button';
                 previewButton.className = 'small-btn';
-                previewButton.textContent = 'Xem HTML';
+                previewButton.textContent = 'Xem kết quả';
                 previewButton.addEventListener('click', () => openPreview(item.id));
                 actionCell.appendChild(previewButton);
             } else {
@@ -906,7 +1220,7 @@
                 const row = document.getElementById(`item-row-${item.id}`);
                 if (!row) continue;
                 const matchesStatus = status === 'all' || item.status === status;
-                const haystack = `${item.fileName} ${item.productCode || ''} ${item.productName || ''} ${item.detail || ''}`.toLowerCase();
+                const haystack = `${item.fileName} ${item.productCode || ''} ${item.productName || ''} ${item.outputLanguage || ''} ${item.folderName || ''} ${item.detail || ''}`.toLowerCase();
                 row.hidden = !(matchesStatus && (!query || haystack.includes(query)));
             }
         }
@@ -970,6 +1284,9 @@
                         file: sourceFile,
                         productCode: '',
                         productName: '',
+                        outputLanguage: '',
+                        folderName: '',
+                        czRank: 0,
                         status: 'waiting',
                         detail: 'Đang chờ xử lý',
                         html: ''
@@ -993,6 +1310,7 @@
                     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
 
                 for (const entry of entries) {
+                    const folderInfo = detectFolderLanguage(entry.name);
                     items.push({
                         id: id++,
                         index: items.length,
@@ -1003,13 +1321,39 @@
                         entry,
                         productCode: '',
                         productName: '',
+                        outputLanguage: folderInfo ? folderInfo.language : '',
+                        folderName: folderInfo ? folderInfo.folderName : '',
+                        czRank: folderInfo ? folderInfo.czRank : 0,
                         status: 'waiting',
                         detail: 'Đang chờ xử lý',
                         html: ''
                     });
                 }
             }
-            return items;
+
+            const preferredCzProducts = new Set();
+            for (const item of items) {
+                if (item.outputLanguage !== 'CZ' || item.czRank !== 2) continue;
+                try {
+                    const identity = parseFileIdentity(item.fileName);
+                    preferredCzProducts.add(`${identity.productCode}\u0000${cleanText(identity.productName).toLocaleLowerCase()}`);
+                } catch (_error) {
+                    // Giữ file để lỗi tên vẫn được hiển thị ở bước xử lý.
+                }
+            }
+
+            const filteredItems = items.filter(item => {
+                if (item.outputLanguage !== 'CZ' || item.czRank !== 1) return true;
+                try {
+                    const identity = parseFileIdentity(item.fileName);
+                    const key = `${identity.productCode}\u0000${cleanText(identity.productName).toLocaleLowerCase()}`;
+                    return !preferredCzProducts.has(key);
+                } catch (_error) {
+                    return true;
+                }
+            });
+            filteredItems.forEach((item, index) => { item.index = index; });
+            return filteredItems;
         }
 
         async function processSelectedFiles() {
@@ -1045,7 +1389,10 @@
                     try {
                         item.html = await convertDocx(item);
                         item.status = 'success';
-                        item.detail = `Đã tạo HTML: ${(item.languages || []).join(' → ')}`;
+                        const mode = item.outputLanguage === 'EN' || item.outputLanguage === 'CZ'
+                            ? 'format cũ'
+                            : 'giữ nguyên nội dung Word';
+                        item.detail = `Đã tạo HTML: ${item.outputLanguage} — ${mode}`;
                     } catch (error) {
                         item.status = 'error';
                         item.detail = error.message || 'Lỗi không xác định';
@@ -1058,13 +1405,14 @@
                 state.processing = false;
                 state.processed = true;
                 const counts = updateSummary();
+                const grouped = buildProductRows();
                 elements.reviewPanel.classList.add('visible');
-                elements.reviewMessage.textContent = `Hoàn thành ${counts.success} file, lỗi ${counts.error} file. Excel sẽ chỉ chứa các file hoàn thành.`;
+                elements.reviewMessage.textContent = `Hoàn thành ${counts.success} file, lỗi ${counts.error} file. Đã ghép thành ${grouped.rows.length} dòng sản phẩm.`;
                 elements.exportNote.textContent = counts.success
                     ? 'Tool chưa tạo file Excel. Hãy xem lỗi và kiểm tra HTML, sau đó bấm nút duyệt.'
                     : 'Không có file hoàn thành nên chưa thể xuất Excel.';
-                elements.exportButton.disabled = counts.success === 0;
-                elements.exportButton.textContent = `Duyệt & Xuất Excel (${counts.success} dòng)`;
+                elements.exportButton.disabled = grouped.rows.length === 0;
+                elements.exportButton.textContent = `Duyệt & Xuất Excel (${grouped.rows.length} dòng)`;
             } catch (error) {
                 state.processing = false;
                 state.processed = false;
@@ -1086,24 +1434,60 @@
             return `${prefix || 'word_labels'}_html_${stamp}.xlsx`;
         }
 
+        function buildProductRows(sourceItems = state.items) {
+            const groups = new Map();
+            const successfulItems = sourceItems.filter(item => item.status === 'success');
+            for (const item of successfulItems) {
+                const normalizedName = cleanText(item.productName).toLocaleLowerCase();
+                const key = `${item.productCode}\u0000${normalizedName}`;
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        defaultCode: item.productCode,
+                        name: item.productName,
+                        cells: Object.create(null)
+                    });
+                }
+                const group = groups.get(key);
+                const language = item.outputLanguage;
+                const current = group.cells[language];
+                if (!current || (language === 'CZ' && (item.czRank || 0) > (current.czRank || 0))) {
+                    group.cells[language] = item;
+                }
+                if (language === 'EN') group.name = item.productName;
+            }
+            const rows = [...groups.values()].sort((a, b) => {
+                const codeOrder = a.defaultCode.localeCompare(b.defaultCode, undefined, { numeric: true });
+                return codeOrder || a.name.localeCompare(b.name, undefined, { numeric: true });
+            });
+            return { rows };
+        }
+
         function exportApprovedResults() {
             if (!state.processed || state.processing) {
                 alert('Hãy đợi xử lý hoàn tất trước khi duyệt xuất Excel.');
                 return;
             }
             if (state.exported) return;
-            const successfulItems = state.items.filter(item => item.status === 'success');
-            if (!successfulItems.length) {
+            const grouped = buildProductRows();
+            if (!grouped.rows.length) {
                 alert('Không có file hoàn thành để xuất Excel.');
                 return;
             }
 
             const data = [
-                ['Product Code', 'name', 'HTML Code'],
-                ...successfulItems.map(item => [item.productCode, item.productName, item.html])
+                ['default_code', 'name', ...LANGUAGE_COLUMNS],
+                ...grouped.rows.map(group => [
+                    group.defaultCode,
+                    group.name,
+                    ...LANGUAGE_COLUMNS.map(language => group.cells[language]?.html || 'X')
+                ])
             ];
             const worksheet = XLSX.utils.aoa_to_sheet(data);
-            worksheet['!cols'] = [{ wch: 18 }, { wch: 45 }, { wch: 120 }];
+            worksheet['!cols'] = [
+                { wch: 18 },
+                { wch: 45 },
+                ...LANGUAGE_COLUMNS.map(() => ({ wch: 80 }))
+            ];
             const workbook = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(workbook, worksheet, 'Results');
             XLSX.writeFile(workbook, makeOutputName());
@@ -1111,7 +1495,72 @@
             state.exported = true;
             elements.exportButton.disabled = true;
             elements.exportButton.textContent = 'Đã duyệt & xuất Excel';
-            elements.exportNote.textContent = `Đã xuất ${successfulItems.length} dòng thành công. Muốn tạo file mới, hãy bấm “Xóa tất cả” và xử lý lại.`;
+            elements.exportNote.textContent = `Đã xuất ${grouped.rows.length} dòng sản phẩm. Ô ngôn ngữ không có file được đánh dấu X.`;
+        }
+
+        function sanitizePreviewHtml(html) {
+            const template = document.createElement('template');
+            template.innerHTML = html;
+            template.content.querySelectorAll('script, style, iframe, object, embed, link, meta').forEach(node => node.remove());
+            template.content.querySelectorAll('*').forEach(node => {
+                [...node.attributes].forEach(attribute => {
+                    const name = attribute.name.toLowerCase();
+                    const value = attribute.value.trim();
+                    if (name.startsWith('on') || ['src', 'href', 'srcdoc'].includes(name)) {
+                        node.removeAttribute(attribute.name);
+                    } else if (name === 'style' && !/^font-weight\s*:\s*(?:400|normal)\s*;?$/i.test(value)) {
+                        node.removeAttribute(attribute.name);
+                    }
+                });
+            });
+            return template.innerHTML;
+        }
+
+        function setSummaryPreviewMode(mode) {
+            state.previewMode = mode === 'code' ? 'code' : 'visual';
+            const showVisual = state.previewMode === 'visual';
+            elements.previewVisualPanel.hidden = !showVisual;
+            elements.previewCode.hidden = showVisual;
+            elements.previewVisualTab.classList.toggle('active', showVisual);
+            elements.previewCodeTab.classList.toggle('active', !showVisual);
+            elements.previewVisualTab.setAttribute('aria-selected', String(showVisual));
+            elements.previewCodeTab.setAttribute('aria-selected', String(!showVisual));
+        }
+
+        async function renderSummaryPreviewImage(item) {
+            state.previewImageUrl = '';
+            elements.previewImage.hidden = true;
+            elements.previewImage.removeAttribute('src');
+            elements.previewRendered.hidden = false;
+            elements.previewRendered.innerHTML = sanitizePreviewHtml(item.html);
+            elements.previewStatus.textContent = 'Đang tạo ảnh từ HTML…';
+
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            if (state.currentPreviewId !== item.id) return;
+
+            if (typeof html2canvas !== 'function') {
+                elements.previewStatus.textContent = 'Không tải được bộ tạo PNG; đang hiển thị bản render trực tiếp.';
+                return;
+            }
+
+            try {
+                const canvas = await html2canvas(elements.previewRendered, {
+                    backgroundColor: '#ffffff',
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+                if (state.currentPreviewId !== item.id) return;
+                state.previewImageUrl = canvas.toDataURL('image/png');
+                elements.previewImage.src = state.previewImageUrl;
+                elements.previewImage.alt = `Ảnh nhãn ${item.productCode || item.fileName}`;
+                elements.previewImage.hidden = false;
+                elements.previewRendered.hidden = true;
+                elements.previewStatus.textContent = 'Ảnh được tạo trực tiếp từ mã HTML bên dưới.';
+            } catch (error) {
+                console.error('Không thể tạo ảnh xem trước:', error);
+                elements.previewStatus.textContent = 'Không thể tạo PNG; đang hiển thị bản render trực tiếp để kiểm tra.';
+            }
         }
 
         function openPreview(itemId) {
@@ -1120,11 +1569,15 @@
             state.currentPreviewId = itemId;
             elements.previewTitle.textContent = `${item.productCode} — ${item.fileName}`;
             elements.previewCode.textContent = item.html;
+            setSummaryPreviewMode('visual');
             elements.previewBackdrop.classList.add('visible');
+            renderSummaryPreviewImage(item);
         }
 
         function closePreview() {
             state.currentPreviewId = null;
+            state.previewImageUrl = '';
+            elements.previewImage.removeAttribute('src');
             elements.previewBackdrop.classList.remove('visible');
         }
 
@@ -1154,6 +1607,8 @@
         elements.statusFilter.addEventListener('change', applyFilters);
         elements.closePreview.addEventListener('click', closePreview);
         elements.copyPreview.addEventListener('click', copyPreviewHtml);
+        elements.previewVisualTab.addEventListener('click', () => setSummaryPreviewMode('visual'));
+        elements.previewCodeTab.addEventListener('click', () => setSummaryPreviewMode('code'));
         elements.previewBackdrop.addEventListener('click', event => {
             if (event.target === elements.previewBackdrop) closePreview();
         });
@@ -1185,10 +1640,14 @@
 
         window.batchWordTool = {
             parseFileIdentity,
+            detectFolderLanguage,
+            convertWordExactly,
+            buildProductRows,
             convertLanguageBlocks: window.multilingualWordParser.convert,
             parseMetrics: window.multilingualWordParser.parseMetrics
         };
     </script>
+    <script src="import_labels.js?v=20261102-5"></script>
 </body>
 
 </html>

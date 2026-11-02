@@ -218,13 +218,39 @@
         }).join('');
     }
 
+    function sliceParagraphSegments(segments, startOffset) {
+        const result = [];
+        let cursor = 0;
+        for (const segment of segments || []) {
+            const segmentStart = cursor;
+            const segmentEnd = cursor + segment.text.length;
+            cursor = segmentEnd;
+            if (segmentEnd <= startOffset) continue;
+            const text = segment.text.slice(Math.max(0, startOffset - segmentStart));
+            if (!text) continue;
+            result.push({ ...segment, text });
+        }
+        return result;
+    }
+
     function extractLanguageBlock(block) {
-        const description = cleanText(block.paragraphs[0] && block.paragraphs[0].text);
+        const firstParagraph = block.paragraphs[0] || { text: '', segments: [] };
+        const rawFirstParagraph = (firstParagraph.segments || []).map(segment => segment.text).join('');
+        const lineBreakMatch = rawFirstParagraph.match(/\r?\n/);
+        const description = cleanText(lineBreakMatch
+            ? rawFirstParagraph.slice(0, lineBreakMatch.index)
+            : firstParagraph.text);
         if (!description || !new RegExp(`^\\(${block.language}\\)`, 'i').test(description)) {
             throw new Error(`Không tìm thấy mô tả (${block.language}) trong Word.`);
         }
 
         const bodyParagraphs = block.paragraphs.slice(1);
+        if (lineBreakMatch) {
+            const startOffset = lineBreakMatch.index + lineBreakMatch[0].length;
+            const remainderSegments = sliceParagraphSegments(firstParagraph.segments, startOffset);
+            const remainderText = cleanText(remainderSegments.map(segment => segment.text).join(''));
+            if (remainderText) bodyParagraphs.unshift({ text: remainderText, segments: remainderSegments });
+        }
         const stream = buildTextStream(bodyParagraphs);
         const boldGroups = findBoldGroups(stream);
         const nutritionHeading = boldGroups.find(group => /\b100\b/.test(group.text));

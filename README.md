@@ -2,14 +2,33 @@
 
 Ứng dụng web tĩnh xử lý trực tiếp trong trình duyệt:
 
+## Summary Labels
+
 - ZIP hàng loạt và DOCX lẻ
 - EN, FR, DE, CZ, PL, HU, ES, PT, IT, RO, SK, NL, DK, FI, SE, EE
 - File kép ES + PT / ES > PT
 - Tiền tố phiên bản như v0_, v1_, v12_
+- ZIP có nhiều thư mục ngôn ngữ; ngôn ngữ được nhận từ tên thư mục
+- Nếu có đồng thời CZ 5x3 và CZ 7x5, ưu tiên CZ 7x5
+- EN và CZ dùng định dạng chuẩn cũ cùng Storage bắt buộc
+- Các ngôn ngữ còn lại giữ đầy đủ nội dung và định dạng cơ bản theo Word
 - Theo dõi trạng thái và nguyên nhân lỗi
 - Xem trước HTML
 - Duyệt thủ công trước khi xuất Excel
-- Excel gồm Product Code, name và HTML Code
+- Excel gộp theo sản phẩm, gồm default_code, name và các cột ngôn ngữ; ô thiếu ghi X
+
+## IMPORT LABELS
+
+- Nhận nhiều DOCX, mỗi DOCX có nhiều khối ngôn ngữ và một bảng NTF dùng chung
+- Tách từng khối theo mã `(EN)`, `(FR)`, `(DE)`...
+- `default_code` không bắt buộc; tên sản phẩm lấy từ tiêu đề đầu tiên trong Word
+- EN/CZ dùng format cũ, NTF xuống từng dòng và có Storage bắt buộc
+- Các ngôn ngữ khác viết NTF trong một đoạn, cách nhau bằng dấu phẩy, không tự thêm Storage
+- Cho phép chọn Importer hoặc Seller cho từng lần quét; thông tin công ty và liên hệ dùng đúng ngôn ngữ
+- Số chỉ tiêu NTF được đọc động theo từng bảng Word; không giới hạn cố định 7 dòng
+- Giữ cả các dòng bổ sung như chất xơ, natri hoặc chỉ tiêu khác khi nhãn được xác định rõ
+- Dòng không có giá trị hoặc nhãn không xác định được sẽ báo lỗi thay vì tự đoán
+- Excel giữ cấu trúc `default_code`, `name` và các cột ngôn ngữ; ô thiếu ghi X
 
 ## Chạy cục bộ
 
