@@ -23,9 +23,9 @@
 - Mỗi DOCX có nhiều khối ngôn ngữ và một bảng NTF dùng chung
 - Tách từng khối theo mã `(EN)`, `(FR)`, `(DE)`...
 - `default_code` không bắt buộc; tên sản phẩm lấy từ tiêu đề đầu tiên trong Word
-- EN/CZ dùng format cũ, NTF xuống từng dòng và có Storage bắt buộc
+- EN/CZ chỉ gồm mô tả, thành phần, NTF xuống từng dòng và Storage bắt buộc; không thêm thông tin công ty
 - Các ngôn ngữ khác viết NTF trong một đoạn, cách nhau bằng dấu phẩy, không tự thêm Storage
-- Cho phép chọn Importer hoặc Seller cho từng lần quét; thông tin công ty và liên hệ dùng đúng ngôn ngữ
+- Cho phép chọn Importer hoặc Seller cho từng lần quét; chỉ áp dụng cho các ngôn ngữ ngoài EN/CZ
 - Số chỉ tiêu NTF được đọc động theo từng bảng Word; không giới hạn cố định 7 dòng
 - Giữ cả các dòng bổ sung như chất xơ, natri hoặc chỉ tiêu khác khi nhãn được xác định rõ
 - Dòng không có giá trị hoặc nhãn không xác định được sẽ báo lỗi thay vì tự đoán

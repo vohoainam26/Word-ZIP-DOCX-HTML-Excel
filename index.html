@@ -820,10 +820,10 @@
                     <strong>Thông tin công ty:</strong>
                     <label class="checkbox-label"><input type="radio" name="import-company-mode" value="importer" checked> Importer</label>
                     <label class="checkbox-label"><input type="radio" name="import-company-mode" value="seller"> Seller</label>
-                    <span style="color: var(--muted);">Áp dụng cho tất cả DOCX trong lần quét.</span>
+                    <span style="color: var(--muted);">Áp dụng cho các ngôn ngữ ngoài EN/CZ trong tất cả DOCX.</span>
                 </div>
 
-                <p class="import-help"><strong>Quy tắc:</strong> EN/CZ giữ format cũ và xuống dòng NTF; các ngôn ngữ khác viết NTF liền bằng dấu phẩy. Dữ liệu không chắc chắn sẽ báo lỗi thay vì tự đoán.</p>
+                <p class="import-help"><strong>Quy tắc:</strong> EN/CZ chỉ gồm mô tả, thành phần, NTF xuống dòng và Storage; không thêm thông tin công ty. Các ngôn ngữ khác viết NTF liền bằng dấu phẩy và thêm Importer/Seller đã chọn.</p>
 
                 <div class="summary-grid" aria-label="Thống kê IMPORT LABELS">
                     <div class="summary-card"><span>Tổng DOCX</span><strong id="import-count-total">0</strong></div>
@@ -1647,7 +1647,7 @@
             parseMetrics: window.multilingualWordParser.parseMetrics
         };
     </script>
-    <script src="import_labels.js?v=20261102-6"></script>
+    <script src="import_labels.js?v=20261102-8"></script>
 </body>
 
 </html>

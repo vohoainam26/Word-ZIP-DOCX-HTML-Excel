@@ -306,7 +306,7 @@
 
     function languageBlocks(paragraphs) {
         const blocks = [];
-        const markerPattern = /(?:^|[\r\n])[\t ]*►?[\t ]*\(([A-Z]{2})\)[\t ]*/gim;
+        const markerPattern = /(?:^|[\r\n])[\t ]*[►▶]?[\t ]*\(([A-Z]{2})\)[\t ]*/gim;
         paragraphs.forEach((paragraph, paragraphIndex) => {
             const raw = paragraph.segments.map(segment => segment.text).join('');
             const markers = [];
@@ -354,7 +354,7 @@
 
     function parseLanguageParagraph(paragraph, language) {
         const raw = paragraph.segments.map(segment => segment.text).join('');
-        const marker = raw.match(/^\s*►?\s*\(([A-Z]{2})\)\s*/i);
+        const marker = raw.match(/^\s*[►▶]?\s*\(([A-Z]{2})\)\s*/i);
         if (!marker || marker[1].toUpperCase() !== language) throw new Error(`Khối ${language} không hợp lệ.`);
         const ingredientHeading = INGREDIENT_HEADINGS[language];
         const headingPattern = new RegExp(`${escapeRegExp(ingredientHeading)}\\s*:`, 'i');
@@ -477,7 +477,9 @@
             const inlineMetrics = metrics.map(metric => `${metric.label}: ${metric.value}`).join(', ');
             lines.push(`<p><b>${escapeHtml(heading)}:</b> <span style="font-weight: 400;">${escapeHtml(inlineMetrics)}.</span></p>`);
         }
-        lines.push(...companyInfoHtml(block.language, companyMode));
+        if (block.language !== 'EN' && block.language !== 'CZ') {
+            lines.push(...companyInfoHtml(block.language, companyMode));
+        }
         return lines.join('\n');
     }
 
