@@ -27,6 +27,8 @@
 - Các ngôn ngữ khác viết NTF trong một đoạn, cách nhau bằng dấu phẩy, không tự thêm Storage
 - Cho phép chọn Importer hoặc Seller cho từng lần quét; chỉ áp dụng cho các ngôn ngữ ngoài EN/CZ
 - Số chỉ tiêu NTF được đọc động theo từng bảng Word; không giới hạn cố định 7 dòng
+- Hỗ trợ NTF dùng chung nằm trong bảng hoặc một đoạn văn phân cách các chỉ tiêu bằng dấu chấm phẩy
+- Khối ngôn ngữ viết HOA toàn bộ được tự chuyển về kiểu câu, giữ mã E-number và định dạng in đậm
 - Giữ cả các dòng bổ sung như chất xơ, natri hoặc chỉ tiêu khác khi nhãn được xác định rõ
 - Dòng không có giá trị hoặc nhãn không xác định được sẽ báo lỗi thay vì tự đoán
 - Excel giữ cấu trúc `default_code`, `name` và các cột ngôn ngữ; ô thiếu ghi X

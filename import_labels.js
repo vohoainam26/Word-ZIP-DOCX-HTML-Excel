@@ -13,12 +13,12 @@
     };
 
     const NUTRITION_HEADINGS = {
-        EN: 'Nutrition Facts per 100g', FR: 'Valeurs Nutritionnelles pour 100g',
+        EN: 'Nutrition facts per 100g', FR: 'Valeurs nutritionnelles pour 100g',
         DE: 'Nährwertangaben pro 100g', CZ: 'Výživové Údaje na 100g',
-        PL: 'Wartości Odżywcze na 100g', HU: 'Tápanyagtartalom 100g-ban',
-        ES: 'Información Nutricional por 100g', PT: 'Declaração Nutricional por 100g',
-        IT: 'Valori Nutrizionali per 100g', RO: 'Informații Nutriționale per 100g',
-        SK: 'Výživové Údaje na 100g', NL: 'Voedingswaarden per 100g',
+        PL: 'Wartości odżywcze na 100g', HU: 'Tápanyagtartalom 100g-ban',
+        ES: 'Información nutricional por 100g', PT: 'Declaração nutricional por 100g',
+        IT: 'Valori nutrizionali per 100g', RO: 'Informații nutriționale per 100g',
+        SK: 'Výživové údaje na 100g', NL: 'Voedingswaarden per 100g',
         DK: 'Næringsindhold pr 100g', FI: 'Ravintoarvot per 100g',
         SE: 'Näringsvärde per 100g', EE: 'Toitumisalane teave 100g kohta'
     };
@@ -87,7 +87,7 @@
         FR: {
             importer: 'Importateur: PepisCR s.r.o., Leopoldova 2040/30 Chodov, 149 00 Prague 4, République tchèque.',
             seller: 'Vendeur: PepisCR s.r.o., Leopoldova 2040/30 Chodov, 149 00 Prague 4, République tchèque.',
-            contact: 'Web: www.pepis.company, Telefon: +420 608 999 488.'
+            contact: 'Web: www.pepis.company, Téléphone: +420 608 999 488.'
         },
         DE: {
             importer: 'Importeur: PepisCR s.r.o., Leopoldova 2040/30 Chodov, 149 00 Prag 4, Tschechische Republik.',
@@ -304,6 +304,63 @@
         }).join('');
     }
 
+    function isMostlyUppercase(value) {
+        const letters = [...String(value || '')].filter(character => /\p{L}/u.test(character));
+        const casedLetters = letters.filter(character => character.toLocaleUpperCase() !== character.toLocaleLowerCase());
+        if (casedLetters.length < 20) return false;
+        const uppercaseCount = casedLetters.filter(character => character === character.toLocaleUpperCase()).length;
+        return uppercaseCount / casedLetters.length >= 0.82;
+    }
+
+    function restoreAdditiveCodes(value) {
+        return String(value || '').replace(/\be(\d+[a-z]?)\b/giu, (_match, code) => `E${code.toLocaleLowerCase()}`);
+    }
+
+    function sentenceCaseText(value, capitalizeInitial = true) {
+        let capitalizeNext = capitalizeInitial;
+        let result = '';
+        for (const character of String(value || '').toLocaleLowerCase()) {
+            if (capitalizeNext && /\p{L}/u.test(character)) {
+                result += character.toLocaleUpperCase();
+                capitalizeNext = false;
+            } else {
+                result += character;
+            }
+            if (/[.!?]/.test(character)) capitalizeNext = true;
+        }
+        return restoreAdditiveCodes(result);
+    }
+
+    function sentenceCaseSegments(segments, capitalizeInitial = false) {
+        let capitalizeNext = capitalizeInitial;
+        const result = segments.map(segment => {
+            let text = '';
+            for (const character of segment.text.toLocaleLowerCase()) {
+                if (capitalizeNext && /\p{L}/u.test(character)) {
+                    text += character.toLocaleUpperCase();
+                    capitalizeNext = false;
+                } else {
+                    text += character;
+                }
+                if (/[.!?]/.test(character)) capitalizeNext = true;
+            }
+            return { ...segment, text: restoreAdditiveCodes(text).replace(/\s+/g, ' ') };
+        });
+        result.forEach((segment, index) => {
+            if (!segment.bold && !segment.italic && !segment.underline) return;
+            const leadingSpace = /^\s+/.test(segment.text);
+            const trailingSpace = /\s+$/.test(segment.text);
+            segment.text = segment.text.trim();
+            if (leadingSpace && result[index - 1]) {
+                result[index - 1].text = `${result[index - 1].text.replace(/\s+$/, '')} `;
+            }
+            if (trailingSpace && result[index + 1]) {
+                result[index + 1].text = ` ${result[index + 1].text.replace(/^\s+/, '')}`;
+            }
+        });
+        return result.filter(segment => segment.text);
+    }
+
     function languageBlocks(paragraphs) {
         const blocks = [];
         const markerPattern = /(?:^|[\r\n])[\t ]*[►▶]?[\t ]*\(([A-Z]{2})\)[\t ]*/gim;
@@ -363,13 +420,19 @@
         if (!headingMatch) throw new Error(`Không tìm thấy tiêu đề thành phần trong khối ${language}.`);
         const headingStart = marker[0].length + headingMatch.index;
         const ingredientStart = headingStart + headingMatch[0].length;
-        const description = clean(raw.slice(marker[0].length, headingStart));
+        let description = clean(raw.slice(marker[0].length, headingStart));
         const warningRange = trailingWarningRange(raw.slice(ingredientStart), language);
         const ingredientEnd = warningRange ? ingredientStart + warningRange.start : raw.length;
-        const ingredientSegments = sliceSegments(paragraph.segments, ingredientStart, ingredientEnd);
+        let ingredientSegments = sliceSegments(paragraph.segments, ingredientStart, ingredientEnd);
         const warningSegments = warningRange
             ? sliceSegments(paragraph.segments, ingredientStart + warningRange.start, ingredientStart + warningRange.end)
             : [];
+        let warningText = clean(warningSegments.map(segment => segment.text).join(''));
+        if (isMostlyUppercase(raw)) {
+            description = sentenceCaseText(description, true);
+            ingredientSegments = sentenceCaseSegments(ingredientSegments, false);
+            warningText = sentenceCaseText(warningText, true);
+        }
         const ingredientText = clean(ingredientSegments.map(segment => segment.text).join(''));
         if (!description || !ingredientText) throw new Error(`Khối ${language} thiếu mô tả hoặc thành phần.`);
         return {
@@ -377,12 +440,37 @@
             description,
             ingredientHeading: `${ingredientHeading}:`,
             ingredientSegments,
-            warningText: clean(warningSegments.map(segment => segment.text).join(''))
+            warningText
         };
     }
 
     function findNutritionTable(tables) {
         return tables.find(rows => rows.length >= 2 && rows[0] && rows[0].length >= 2 && /100\s*g/i.test(rows[0][1].text));
+    }
+
+    function findInlineNutrition(paragraphs) {
+        const headingAliases = Object.values(NUTRITION_HEADING_ALIASES).flat().map(normalizedLabel);
+        for (const paragraph of paragraphs) {
+            const raw = paragraph.segments.map(segment => segment.text).join('');
+            const perMatch = /(?:\s+(?:per|pour|pro|na|por|pr)\s+)?100\s*g\s*:\s*/i.exec(raw);
+            if (!perMatch) continue;
+            const headingSource = clean(raw.slice(0, perMatch.index));
+            const normalizedHeading = normalizedLabel(headingSource);
+            if (!headingAliases.some(alias => normalizedHeading.includes(alias))) continue;
+
+            const metricSource = raw.slice(perMatch.index + perMatch[0].length);
+            const chunks = metricSource.split(';').map(clean).filter(Boolean);
+            const rows = [[{ text: headingSource }, { text: 'Per 100g' }]];
+            for (const chunk of chunks) {
+                const valueMatch = chunk.match(/((?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kJ\s*\/\s*(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*kcal|(?:[<>≤≥~]\s*)?\d+(?:[.,]\d+)?\s*(?:g|mg|µg|mcg|%))\s*\.?\s*$/i);
+                if (!valueMatch) continue;
+                const label = clean(chunk.slice(0, valueMatch.index));
+                const value = clean(valueMatch[1]);
+                if (label && value) rows.push([{ text: label }, { text: value }]);
+            }
+            if (rows.length >= 2) return rows;
+        }
+        return null;
     }
 
     function sourceVariants(value) {
@@ -404,7 +492,7 @@
     }
 
     function parseNutrition(table, languages) {
-        if (!table) throw new Error('Không tìm thấy bảng NTF dùng chung có mốc 100g.');
+        if (!table) throw new Error('Không tìm thấy NTF dùng chung có mốc 100g trong bảng hoặc đoạn văn.');
         const dataRows = table.slice(1).filter(row => row.length >= 2 && clean(row[1].text));
         if (!dataRows.length) throw new Error('Bảng NTF không có chỉ tiêu nào có dữ liệu.');
         const headingSource = clean(table[0][0].text);
@@ -498,7 +586,8 @@
         const name = clean(titleParagraph ? titleParagraph.text : file.name.replace(/\.docx$/i, ''));
         if (!name) throw new Error('Không tìm thấy tên sản phẩm.');
         const detectedLanguages = [...new Set(blocks.map(block => block.language))];
-        const nutrition = parseNutrition(findNutritionTable(doc.tables), detectedLanguages);
+        const nutritionSource = findNutritionTable(doc.tables) || findInlineNutrition(doc.paragraphs);
+        const nutrition = parseNutrition(nutritionSource, detectedLanguages);
         const htmlByLanguage = Object.create(null);
         const warnings = [];
         for (const blockData of blocks) {
