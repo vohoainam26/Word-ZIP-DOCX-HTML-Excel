@@ -78,6 +78,30 @@
         EE: [/^sisaldab\b/, /^voib sisaldada\b/, /^hoiatus\b/]
     };
 
+    const COLOR_ACTIVITY_WARNING_TEMPLATES = {
+        EN: 'Warning: {codes} may have an adverse effect on activity and attention in children.',
+        FR: 'Avertissement : {codes} peuvent avoir des effets indésirables sur l’activité et l’attention chez les enfants.',
+        DE: 'Warnhinweis: {codes} können Aktivität und Aufmerksamkeit bei Kindern beeinträchtigen.',
+        CZ: 'Varování: {codes} mohou mít nepříznivý vliv na aktivitu a pozornost dětí.',
+        PL: 'Ostrzeżenie: {codes} mogą mieć szkodliwy wpływ na aktywność i skupienie uwagi u dzieci.',
+        HU: 'Figyelmeztetés: {codes} káros hatással lehetnek a gyermekek tevékenységére és figyelmére.',
+        ES: 'Advertencia: {codes} pueden tener efectos negativos sobre la actividad y la atención de los niños.',
+        PT: 'Aviso: {codes} podem ter efeitos negativos na atividade e na atenção das crianças.',
+        IT: 'Avvertenza: {codes} possono influire negativamente sull’attività e sull’attenzione dei bambini.',
+        RO: 'Avertisment: {codes} pot avea efecte negative asupra activității și atenției copiilor.',
+        SK: 'Upozornenie: {codes} môžu mať nepriaznivý vplyv na aktivitu a pozornosť detí.',
+        NL: 'Waarschuwing: {codes} kunnen de activiteit en oplettendheid van kinderen nadelig beïnvloeden.',
+        DK: 'Advarsel: {codes} kan have en negativ indvirkning på børns aktivitet og opmærksomhed.',
+        FI: 'Varoitus: {codes} voivat vaikuttaa haitallisesti lasten aktiivisuuteen ja tarkkaavaisuuteen.',
+        SE: 'Varning: {codes} kan ha en negativ inverkan på barns aktivitet och uppmärksamhet.',
+        EE: 'Hoiatus: {codes} võivad avaldada kahjulikku mõju laste aktiivsusele ja tähelepanuvõimele.'
+    };
+
+    const WARNING_CONJUNCTIONS = {
+        EN: 'and', FR: 'et', DE: 'und', CZ: 'a', PL: 'i', HU: 'és', ES: 'y', PT: 'e', IT: 'e',
+        RO: 'și', SK: 'a', NL: 'en', DK: 'og', FI: 'ja', SE: 'och', EE: 'ja'
+    };
+
     const COMPANY_INFO = {
         EN: {
             importer: 'Importer: PepisCR s.r.o., Leopoldova 2040/30 Chodov, 149 00 Prague 4 Czech Republic.',
@@ -161,10 +185,15 @@
         }
     };
 
+    const COMPANY_ROLE_LABELS = {
+        importer: [...new Set(Object.values(COMPANY_INFO).map(info => info.importer.split(':')[0].trim()))],
+        seller: [...new Set(Object.values(COMPANY_INFO).map(info => info.seller.split(':')[0].trim()))]
+    };
+
     const state = {
-        items: [], processing: false, processed: false, exported: false,
+        items: [], brandGroups: [], processing: false, processed: false, exported: false,
         previewItemId: null, previewLanguage: '', previewMode: 'visual',
-        previewImageUrl: '', previewRenderToken: 0, companyMode: 'importer'
+        previewImageUrl: '', previewRenderToken: 0, phase: 'idle'
     };
 
     const el = {};
@@ -176,6 +205,215 @@
     function normalizedLabel(value) {
         return clean(value).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
             .replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    function companyRoleTextUnits(doc) {
+        const units = [...(doc.paragraphs || []).map(paragraph => paragraph.text)];
+        for (const table of doc.tables || []) {
+            for (const row of table) {
+                for (const cell of row) {
+                    if (cell.text) units.push(cell.text);
+                    for (const paragraph of cell.paragraphs || []) {
+                        if (paragraph.text) units.push(paragraph.text);
+                    }
+                }
+            }
+        }
+        return units.map(clean).filter(Boolean);
+    }
+
+    function detectCompanyRole(doc) {
+        const units = companyRoleTextUnits(doc);
+        const matches = { importer: [], seller: [] };
+        for (const role of ['importer', 'seller']) {
+            for (const label of COMPANY_ROLE_LABELS[role]) {
+                const normalizedRole = normalizedLabel(label);
+                const rawPattern = new RegExp(`(?:^|[\\s\\n])${escapeRegExp(label).replace(/\\s+/g, '\\s+')}\\s*:`, 'iu');
+                for (const unit of units) {
+                    const normalizedUnit = normalizedLabel(unit);
+                    const normalizedPattern = new RegExp(`(?:^|\\s)${escapeRegExp(normalizedRole).replace(/\\s+/g, '\\s+')}(?:\\s|$)`, 'u');
+                    if (rawPattern.test(unit) || normalizedPattern.test(normalizedUnit) && /pepis\s*cr/i.test(unit)) {
+                        matches[role].push({ label, text: unit });
+                    }
+                }
+            }
+        }
+        const hasImporter = matches.importer.length > 0;
+        const hasSeller = matches.seller.length > 0;
+        if (hasImporter && hasSeller) {
+            return {
+                role: '', status: 'ambiguous',
+                detail: 'Word có cả nhãn Importer và Seller; cần chọn thủ công.', matches
+            };
+        }
+        if (hasImporter || hasSeller) {
+            const role = hasSeller ? 'seller' : 'importer';
+            const first = matches[role][0];
+            return {
+                role, status: 'detected',
+                detail: `Đọc từ Word: ${first.label} (${role === 'seller' ? 'Seller' : 'Importer'}).`, matches
+            };
+        }
+        return {
+            role: '', status: 'missing',
+            detail: 'Không tìm thấy nhãn Importer hoặc Seller trong Word; cần chọn thủ công.', matches
+        };
+    }
+
+    function cleanBrandName(value) {
+        return clean(value)
+            .replace(/^(?:seller|importer)[\s_-]*/i, '')
+            .replace(/^sy\d{5,}\s*/i, '')
+            .replace(/-20\d{6}t\d{6}z-\d+-\d+$/i, '')
+            .trim();
+    }
+
+    function isGenericBrandFolder(value) {
+        const normalized = normalizedLabel(value);
+        return !normalized
+            || /^(?:odoo|translation|translations|ingredient|ingredients|ai file|daily labels|import labels)$/.test(normalized)
+            || /^(?:en|fr|de|cz|pl|hu|es|pt|it|ro|sk|nl|dk|fi|se|ee)(?:\s|$)/.test(normalized)
+            || /^\d{1,2}\s*\d{4}/.test(normalized)
+            || /^\d+\s*x\s*\d+\s*cm$/.test(normalized);
+    }
+
+    function inferBrand(sourcePath, fileName, productName, uniqueId = '') {
+        const folders = String(sourcePath || '').replace(/\\/g, '/').split('/').slice(0, -1);
+        for (const folder of folders) {
+            const candidate = cleanBrandName(folder);
+            if (!isGenericBrandFolder(candidate)) {
+                return { name: candidate, source: 'folder', needsName: false };
+            }
+        }
+        const stem = clean(productName || fileName.replace(/\.docx$/i, ''))
+            .replace(/^specification\s+/i, '')
+            .replace(/^(?:v\d+_)?(?:en|fr|de|cz|pl|hu|es|pt|it|ro|sk|nl|dk|fi|se|ee)(?:\s*\+\s*(?:es|pt))?[\s_-]+/i, '')
+            .replace(/^\d+(?:-\d+)?[\s_-]+/, '');
+        const token = stem.match(/^[\p{L}\p{N}&'’.-]+/u)?.[0] || '';
+        if (token && /\p{L}/u.test(token)) return { name: token, source: 'filename', needsName: false };
+        return {
+            name: `Không xác định${uniqueId ? ` ${uniqueId}` : ''}`,
+            source: 'unknown',
+            needsName: true
+        };
+    }
+
+    function buildImportBrandGroups(items) {
+        const groups = new Map();
+        for (const item of items.filter(candidate => candidate.status !== 'error' && candidate.inspection)) {
+            const brandInfo = inferBrand(item.sourcePath, item.fileName, item.name, item.id);
+            item.brand = brandInfo.name;
+            item.brandSource = brandInfo.source;
+            const key = normalizedLabel(brandInfo.name) || `unknown-${item.id}`;
+            if (!groups.has(key)) {
+                groups.set(key, {
+                    id: `import-brand-${groups.size + 1}`,
+                    brand: brandInfo.name,
+                    brandSource: brandInfo.source,
+                    needsName: brandInfo.needsName,
+                    items: [],
+                    companyRole: '',
+                    companyRoleSource: '',
+                    detail: ''
+                });
+            }
+            groups.get(key).items.push(item);
+        }
+        for (const group of groups.values()) {
+            const detections = group.items.map(item => item.companyRoleDetection || { role: '', status: 'missing' });
+            const roles = [...new Set(detections.map(detection => detection.role).filter(Boolean))];
+            const ambiguous = detections.some(detection => detection.status === 'ambiguous') || roles.length > 1;
+            if (ambiguous) {
+                group.detail = 'Các Word trong brand có cả Importer và Seller; cần chọn một vai trò cho toàn brand.';
+            } else if (roles.length === 1) {
+                group.companyRole = roles[0];
+                group.companyRoleSource = 'detected';
+                const missingCount = detections.filter(detection => !detection.role).length;
+                group.detail = missingCount
+                    ? `Đọc được ${group.companyRole === 'seller' ? 'Seller' : 'Importer'} từ Word; áp dụng cho ${missingCount} sản phẩm cùng brand chưa ghi vai trò.`
+                    : `Toàn bộ Word trong brand thống nhất: ${group.companyRole === 'seller' ? 'Seller' : 'Importer'}.`;
+            } else {
+                group.detail = 'Không Word nào trong brand ghi Importer/Seller; cần chọn một lần cho toàn brand.';
+            }
+            group.items.forEach(item => {
+                item.companyRole = group.companyRole;
+                item.companyRoleSource = group.companyRoleSource;
+            });
+        }
+        return [...groups.values()].sort((left, right) => left.brand.localeCompare(right.brand, undefined, { numeric: true }));
+    }
+
+    function unresolvedImportBrandGroups() {
+        return state.brandGroups.filter(group => group.needsName || !['importer', 'seller'].includes(group.companyRole));
+    }
+
+    function setImportBrandRole(group, role) {
+        group.companyRole = role;
+        group.companyRoleSource = role ? 'manual' : '';
+        group.detail = role
+            ? `Đã chọn thủ công ${role === 'seller' ? 'Seller' : 'Importer'} cho toàn brand.`
+            : 'Cần chọn Importer hoặc Seller cho brand.';
+        group.items.forEach(item => {
+            item.companyRole = role;
+            item.companyRoleSource = group.companyRoleSource;
+        });
+        renderRows();
+        renderImportBrandGroups();
+        updateSummary();
+    }
+
+    function setImportBrandName(group, value) {
+        const brand = cleanBrandName(value);
+        group.needsName = !brand;
+        if (brand) {
+            group.brand = brand;
+            group.brandSource = 'manual';
+            group.items.forEach(item => {
+                item.brand = brand;
+                item.brandSource = 'manual';
+            });
+        }
+        renderRows();
+        updateSummary();
+    }
+
+    function colorActivityWarningCodes(value) {
+        const normalized = normalizedLabel(value);
+        const isActivityWarning = /adverse effect.*activity.*attention.*children/.test(normalized)
+            || /nepriznivy vliv.*aktivitu.*pozornost.*deti/.test(normalized);
+        if (!isActivityWarning) return [];
+        return [...new Set((String(value).match(/\bE\s*[- ]?\s*\d{3,4}[a-z]?\b/gi) || [])
+            .map(code => code.toUpperCase().replace(/[\s-]+/g, '')))];
+    }
+
+    function localizedList(values, language) {
+        if (values.length < 2) return values[0] || '';
+        const conjunction = WARNING_CONJUNCTIONS[language] || WARNING_CONJUNCTIONS.EN;
+        if (values.length === 2) return `${values[0]} ${conjunction} ${values[1]}`;
+        return `${values.slice(0, -1).join(', ')} ${conjunction} ${values[values.length - 1]}`;
+    }
+
+    function translateGlobalWarning(value, language) {
+        const codes = colorActivityWarningCodes(value);
+        const template = COLOR_ACTIVITY_WARNING_TEMPLATES[language];
+        return codes.length && template
+            ? template.replace('{codes}', localizedList(codes, language))
+            : '';
+    }
+
+    function translatedGlobalWarnings(paragraphs, language) {
+        const translated = [];
+        const seen = new Set();
+        for (const paragraph of paragraphs) {
+            const raw = paragraph.segments.map(segment => segment.text).join('');
+            const warning = translateGlobalWarning(raw, language);
+            if (!warning) continue;
+            const signature = colorActivityWarningCodes(raw).join('|') || normalizedLabel(warning);
+            if (seen.has(signature)) continue;
+            seen.add(signature);
+            translated.push(warning);
+        }
+        return translated;
     }
 
     function escapeHtml(value) {
@@ -803,14 +1041,21 @@
                 return false;
             }
         }).map(block => block.language);
-        return { doc, blocks, contentLanguages, name, defaultCode: optionalCode(file.name) };
+        const companyRole = detectCompanyRole(doc);
+        return { doc, blocks, contentLanguages, name, defaultCode: optionalCode(file.name), companyRole };
     }
 
-    async function convertFile(file, id, companyMode = 'importer', inspection = null, nutritionFallbacks = []) {
+    async function convertFile(file, id, companyMode, inspection = null, nutritionFallbacks = []) {
+        if (!['importer', 'seller'].includes(companyMode)) {
+            throw new Error('Chưa xác định Importer hay Seller cho sản phẩm.');
+        }
         const inspected = inspection || await inspectFile(file);
         const { doc, blocks, name } = inspected;
         if (!blocks.length) throw new Error('Không tìm thấy khối ngôn ngữ dạng (EN), (FR), (DE)...');
         const detectedLanguages = [...new Set(blocks.map(block => block.language))];
+        const globalWarningsByLanguage = Object.fromEntries(
+            detectedLanguages.map(language => [language, translatedGlobalWarnings(doc.paragraphs, language)])
+        );
         let nutritionBundle = parseDocumentNutrition(doc, detectedLanguages);
         let nutritionFallback = null;
         if (!nutritionBundle) {
@@ -846,6 +1091,19 @@
             }
             try {
                 const block = parseLanguageParagraph(blockData.paragraph, blockData.language);
+                const translatedWarnings = globalWarningsByLanguage[blockData.language] || [];
+                if (translatedWarnings.length) {
+                    const warningParts = [block.warningText, ...translatedWarnings].filter(Boolean);
+                    const uniqueWarnings = [];
+                    const seenWarnings = new Set();
+                    for (const warning of warningParts) {
+                        const signature = colorActivityWarningCodes(warning).join('|') || normalizedLabel(warning);
+                        if (seenWarnings.has(signature)) continue;
+                        seenWarnings.add(signature);
+                        uniqueWarnings.push(warning);
+                    }
+                    block.warningText = uniqueWarnings.join(' ');
+                }
                 const nutrition = nutritionBundle.byLanguage?.[blockData.language] || nutritionBundle.shared;
                 if (!nutrition) throw new Error(`Không tìm thấy NTF cho ngôn ngữ ${blockData.language} trong Word.`);
                 htmlByLanguage[blockData.language] = buildLanguageHtml(block, nutrition, companyMode);
@@ -868,10 +1126,46 @@
         return status === 'success' ? '✓ Hoàn thành' : status === 'error' ? '! Lỗi' : status === 'processing' ? '◌ Đang xử lý' : '• Đang chờ';
     }
 
+    function renderImportBrandGroups() {
+        const visible = state.phase === 'role-review' && state.brandGroups.length > 0;
+        el.brandPanel.hidden = !visible;
+        el.brandBody.innerHTML = '';
+        if (!visible) return;
+        state.brandGroups.forEach((group, index) => {
+            const row = document.createElement('tr');
+            const productNames = group.items.map(item => item.name || item.fileName);
+            const brandControl = group.needsName
+                ? `<input class="brand-name-input" type="text" placeholder="Nhập tên brand" aria-label="Tên brand nhóm ${index + 1}">`
+                : `<div class="file-name">${escapeHtml(group.brand)}</div><div class="source-name">${group.brandSource === 'folder' ? 'Lấy từ thư mục' : group.brandSource === 'manual' ? 'Nhập thủ công' : 'Suy từ tên sản phẩm'}</div>`;
+            row.innerHTML = `
+                <td>${brandControl}</td>
+                <td><strong>${group.items.length}</strong><div class="source-name">${escapeHtml(productNames.slice(0, 4).join(' • '))}${productNames.length > 4 ? ` • +${productNames.length - 4} sản phẩm` : ''}</div></td>
+                <td>${escapeHtml(group.detail)}</td>
+                <td class="brand-role-choice"></td>`;
+            if (group.needsName) {
+                const input = row.querySelector('.brand-name-input');
+                input.addEventListener('input', event => setImportBrandName(group, event.target.value));
+                input.addEventListener('blur', renderImportBrandGroups);
+            }
+            const roleCell = row.querySelector('.brand-role-choice');
+            if (group.companyRoleSource === 'detected') {
+                roleCell.innerHTML = `<span class="status-badge status-success">${group.companyRole === 'seller' ? 'Seller' : 'Importer'}</span><div class="source-name">Tự động theo brand</div>`;
+            } else {
+                const select = document.createElement('select');
+                select.className = 'company-role-select';
+                select.innerHTML = '<option value="">— Chọn vai trò —</option><option value="importer">Importer</option><option value="seller">Seller</option>';
+                select.value = group.companyRole || '';
+                select.addEventListener('change', () => setImportBrandRole(group, select.value));
+                roleCell.appendChild(select);
+            }
+            el.brandBody.appendChild(row);
+        });
+    }
+
     function renderRows() {
         el.body.innerHTML = '';
         if (!state.items.length) {
-            el.body.innerHTML = '<tr><td colspan="8" class="empty-state">Chưa có file DOCX nào được quét.</td></tr>';
+            el.body.innerHTML = '<tr><td colspan="9" class="empty-state">Chưa có file DOCX nào được quét.</td></tr>';
             return;
         }
         state.items.forEach((item, index) => {
@@ -887,11 +1181,19 @@
                 <td><input class="import-code-input" type="text" value="${codeValue}" placeholder="Không bắt buộc"></td>
                 <td>${escapeHtml(item.name || '—')}</td>
                 <td>${escapeHtml((item.languages || []).join(', ') || '—')}</td>
+                <td class="import-company-role"></td>
                 <td><span class="status-badge status-${item.status}">${statusLabel(item.status)}</span></td>
                 <td class="detail-cell">${escapeHtml(item.detail || '—')}</td>
                 <td class="action-cell"></td>`;
             const input = row.querySelector('.import-code-input');
             input.addEventListener('input', () => { item.defaultCode = input.value.trim(); });
+            const roleCell = row.querySelector('.import-company-role');
+            if (item.status === 'error') {
+                roleCell.textContent = '—';
+            } else {
+                const roleText = item.companyRole === 'seller' ? 'Seller' : item.companyRole === 'importer' ? 'Importer' : 'Chưa chọn';
+                roleCell.innerHTML = `<div class="file-name">${escapeHtml(item.brand || 'Không xác định')}</div><span class="status-badge status-${item.companyRole ? 'success' : 'error'}">${roleText}</span>`;
+            }
             if (item.status === 'success') {
                 const button = document.createElement('button');
                 button.className = 'small-btn';
@@ -908,11 +1210,25 @@
         const total = state.items.length;
         const success = state.items.filter(item => item.status === 'success').length;
         const error = state.items.filter(item => item.status === 'error').length;
+        const roleCandidates = state.items.filter(item => item.status !== 'error' && item.inspection);
+        const unresolvedBrands = unresolvedImportBrandGroups();
+        const detectedBrands = state.brandGroups.filter(group => group.companyRoleSource === 'detected' && !group.needsName).length;
+        const manualBrands = state.brandGroups.filter(group => group.companyRoleSource === 'manual' && !group.needsName).length;
         el.total.textContent = total;
         el.success.textContent = success;
         el.error.textContent = error;
-        el.review.classList.toggle('visible', state.processed);
-        el.reviewMessage.textContent = state.processed ? `Hoàn thành ${success} file, lỗi ${error} file. default_code có thể để trống.` : '';
+        el.review.classList.toggle('visible', state.phase === 'role-review' || state.processed);
+        if (state.phase === 'role-review') {
+            el.reviewMessage.textContent = unresolvedBrands.length
+                ? `Đã gom ${roleCandidates.length} sản phẩm thành ${state.brandGroups.length} brand: tự động ${detectedBrands}, chọn thủ công ${manualBrands}; còn ${unresolvedBrands.length} brand cần bổ sung trước khi chuyển HTML.`
+                : `Đã xác định vai trò cho toàn bộ ${state.brandGroups.length} brand (${roleCandidates.length} sản phẩm). Có thể bắt đầu chuyển HTML.`;
+        } else {
+            el.reviewMessage.textContent = state.processed ? `Hoàn thành ${success} file, lỗi ${error} file. default_code có thể để trống.` : '';
+        }
+        el.convertButton.disabled = state.processing || state.phase !== 'role-review' || unresolvedBrands.length > 0 || roleCandidates.length === 0;
+        el.convertButton.textContent = state.processing && state.phase === 'converting'
+            ? 'Đang chuyển HTML…'
+            : `Bắt đầu chuyển HTML (${state.brandGroups.length - unresolvedBrands.length}/${state.brandGroups.length} brand)`;
         el.exportButton.disabled = !state.processed || !success;
         el.exportButton.textContent = `Duyệt & Xuất Excel (${success} dòng)`;
     }
@@ -994,12 +1310,16 @@
         state.processing = true;
         state.processed = false;
         state.exported = false;
-        state.companyMode = document.querySelector('input[name="import-company-mode"]:checked')?.value || 'importer';
+        state.brandGroups = [];
+        state.phase = 'inspecting';
         el.processButton.disabled = true;
+        el.processButton.textContent = 'Đang kiểm tra Importer/Seller…';
         const descriptors = await scanImportSources(sourceFiles);
         if (!descriptors.length) {
             state.processing = false;
+            state.phase = 'idle';
             el.processButton.disabled = false;
+            el.processButton.textContent = 'Kiểm tra Importer/Seller';
             alert('Không tìm thấy file DOCX hợp lệ trong dữ liệu đã chọn.');
             return;
         }
@@ -1010,8 +1330,12 @@
             defaultCode: optionalCode(descriptor.fileName),
             languages: [],
             htmlByLanguage: Object.create(null),
+            inspection: null,
+            companyRole: '',
+            companyRoleSource: '',
+            companyRoleDetection: null,
             status: descriptor.preError ? 'error' : 'waiting',
-            detail: descriptor.preError || 'Đang chờ xử lý'
+            detail: descriptor.preError || 'Đang chờ đọc vai trò công ty'
         }));
         renderRows();
         updateSummary();
@@ -1019,7 +1343,7 @@
             const item = state.items[index];
             if (item.status === 'error') continue;
             item.status = 'processing';
-            item.detail = item.sourceType === 'zip' ? 'Đang giải nén và đọc DOCX' : 'Đang đọc DOCX';
+            item.detail = item.sourceType === 'zip' ? 'Đang giải nén và đọc Importer/Seller' : 'Đang đọc Importer/Seller';
             renderRows();
             try {
                 const file = item.file || new File(
@@ -1027,10 +1351,63 @@
                     item.fileName,
                     { type: item.docxMime, lastModified: Date.now() }
                 );
-                const converted = await convertFile(file, item.id, state.companyMode);
+                const inspection = await inspectFile(file);
+                item.file = file;
+                item.inspection = inspection;
+                item.name = inspection.name;
+                item.defaultCode = inspection.defaultCode || item.defaultCode;
+                item.languages = [...new Set(inspection.blocks.map(block => block.language))];
+                item.companyRoleDetection = inspection.companyRole;
+                item.companyRole = inspection.companyRole.role;
+                item.companyRoleSource = inspection.companyRole.role ? 'detected' : '';
+                item.status = 'waiting';
+                item.detail = inspection.companyRole.detail;
+            } catch (error) {
+                item.status = 'error';
+                item.detail = error.message || 'Lỗi không xác định';
+            }
+            renderRows();
+            updateSummary();
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+        state.processing = false;
+        state.brandGroups = buildImportBrandGroups(state.items);
+        state.phase = 'role-review';
+        state.processed = false;
+        el.processButton.disabled = false;
+        el.processButton.textContent = 'Kiểm tra Importer/Seller';
+        renderRows();
+        renderImportBrandGroups();
+        updateSummary();
+    }
+
+    async function convertPreparedFiles() {
+        if (state.processing || state.phase !== 'role-review') return;
+        const candidates = state.items.filter(item => item.status !== 'error' && item.inspection);
+        const unresolved = unresolvedImportBrandGroups();
+        if (unresolved.length) {
+            alert(`Còn ${unresolved.length} brand chưa có tên hoặc chưa chọn Importer/Seller.`);
+            return;
+        }
+        if (!candidates.length) return;
+
+        state.processing = true;
+        state.phase = 'converting';
+        state.processed = false;
+        updateSummary();
+        for (let index = 0; index < state.items.length; index += 1) {
+            const item = state.items[index];
+            if (item.status === 'error' || !item.inspection) continue;
+            item.status = 'processing';
+            item.detail = `Đang chuyển HTML theo ${item.companyRole === 'seller' ? 'Seller' : 'Importer'}`;
+            renderRows();
+            try {
+                const converted = await convertFile(item.file, item.id, item.companyRole, item.inspection);
                 converted.sourceType = item.sourceType;
                 converted.sourceName = item.sourceName;
                 converted.sourcePath = item.sourcePath;
+                converted.companyRoleSource = item.companyRoleSource;
+                converted.companyRoleDetection = item.companyRoleDetection;
                 state.items[index] = converted;
             } catch (error) {
                 item.status = 'error';
@@ -1041,18 +1418,23 @@
             await new Promise(resolve => setTimeout(resolve, 0));
         }
         state.processing = false;
+        state.phase = 'converted';
         state.processed = true;
-        el.processButton.disabled = false;
+        renderRows();
+        renderImportBrandGroups();
         updateSummary();
     }
 
     function reset() {
         state.items = [];
+        state.brandGroups = [];
         state.processing = false;
         state.processed = false;
         state.exported = false;
+        state.phase = 'idle';
         el.files.value = '';
         renderRows();
+        renderImportBrandGroups();
         updateSummary();
     }
 
@@ -1194,7 +1576,10 @@
         Object.assign(el, {
             files: document.getElementById('import-source-files'),
             processButton: document.getElementById('import-process-button'),
+            convertButton: document.getElementById('import-convert-button'),
             resetButton: document.getElementById('import-reset-button'),
+            brandPanel: document.getElementById('import-brand-role-panel'),
+            brandBody: document.getElementById('import-brand-role-body'),
             body: document.getElementById('import-results-body'),
             total: document.getElementById('import-count-total'),
             success: document.getElementById('import-count-success'),
@@ -1217,6 +1602,7 @@
         });
         initTabs();
         el.processButton.addEventListener('click', processFiles);
+        el.convertButton.addEventListener('click', convertPreparedFiles);
         el.resetButton.addEventListener('click', reset);
         el.exportButton.addEventListener('click', exportExcel);
         el.previewSelect.addEventListener('change', updatePreviewLanguage);
@@ -1250,6 +1636,15 @@
         reset();
     }
 
-    window.importLabelsTool = { inspectFile, convertFile, parseLanguageParagraph, parseNutrition, buildLanguageHtml };
+    window.importLabelsTool = {
+        inspectFile,
+        convertFile,
+        detectCompanyRole,
+        inferBrand,
+        parseLanguageParagraph,
+        parseNutrition,
+        buildLanguageHtml,
+        translateGlobalWarning
+    };
     document.addEventListener('DOMContentLoaded', init);
 })();

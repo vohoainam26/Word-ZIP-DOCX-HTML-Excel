@@ -61,17 +61,22 @@
     }
 
     function getLanguageMarker(paragraph) {
-        const match = String(paragraph && paragraph.text || '').match(/^\(([A-Z]{2})\)\s*/i);
-        if (!match) return null;
-        const language = match[1].toUpperCase();
-        return SUPPORTED_LANGUAGES.has(language) ? language : null;
+        const raw = (paragraph?.segments || []).map(segment => segment.text).join('')
+            || String(paragraph?.text || '');
+        const pattern = /\(([A-Z]{2})\)\s*/gi;
+        let match;
+        while ((match = pattern.exec(raw)) !== null) {
+            const language = match[1].toUpperCase();
+            if (SUPPORTED_LANGUAGES.has(language)) return { language, offset: match.index };
+        }
+        return null;
     }
 
     function splitLanguageBlocks(paragraphs, expectedLanguages) {
         const markers = [];
         paragraphs.forEach((paragraph, index) => {
-            const language = getLanguageMarker(paragraph);
-            if (language) markers.push({ language, index });
+            const marker = getLanguageMarker(paragraph);
+            if (marker) markers.push({ ...marker, index });
         });
 
         const blocks = [];
@@ -84,10 +89,16 @@
             const marker = markers[markerPosition];
             const nextMarker = markers.find(candidate => candidate.index > marker.index);
             const endIndex = nextMarker ? nextMarker.index : paragraphs.length;
-            blocks.push({
-                language,
-                paragraphs: paragraphs.slice(marker.index, endIndex)
-            });
+            const blockParagraphs = paragraphs.slice(marker.index, endIndex);
+            if (marker.offset > 0 && blockParagraphs.length) {
+                const firstParagraph = blockParagraphs[0];
+                const segments = sliceParagraphSegments(firstParagraph.segments, marker.offset);
+                blockParagraphs[0] = {
+                    text: cleanText(segments.map(segment => segment.text).join('')),
+                    segments
+                };
+            }
+            blocks.push({ language, paragraphs: blockParagraphs });
             searchAfter = marker.index;
         }
         return blocks;

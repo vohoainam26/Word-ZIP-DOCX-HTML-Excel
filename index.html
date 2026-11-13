@@ -9,7 +9,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    <script src="word_zip_multilang.js?v=20261102-2"></script>
+    <script src="word_zip_multilang.js?v=20261103-3"></script>
     <style>
         :root {
             --bg: #f3f6fb;
@@ -612,7 +612,8 @@
         }
 
         .import-code-input,
-        .import-language-select {
+        .import-language-select,
+        .company-role-select {
             width: 100%;
             min-height: 38px;
             border: 1px solid var(--border);
@@ -631,6 +632,32 @@
 
         .import-help strong {
             color: var(--text);
+        }
+
+        .brand-role-panel {
+            margin-top: 16px;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--surface-soft);
+        }
+
+        .brand-role-panel h3 {
+            margin: 0 0 6px;
+        }
+
+        .brand-role-panel > p {
+            margin: 0 0 12px;
+            color: var(--muted);
+        }
+
+        .brand-name-input {
+            width: 100%;
+            min-height: 38px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: #fff;
         }
 
         .odoo-control-grid {
@@ -654,7 +681,8 @@
         }
 
         .odoo-select,
-        .odoo-match-select {
+        .odoo-match-select,
+        .company-role-select {
             width: 100%;
             min-height: 40px;
             border: 1px solid var(--border);
@@ -667,6 +695,7 @@
 
         .odoo-file-meta,
         .odoo-match-note,
+        .odoo-existing,
         .odoo-missing {
             margin-top: 7px;
             color: var(--muted);
@@ -677,6 +706,23 @@
         .odoo-missing {
             color: var(--danger);
             font-weight: 700;
+        }
+
+        .odoo-existing {
+            color: var(--success);
+            font-weight: 700;
+        }
+
+        .odoo-overwrite {
+            margin-top: 7px;
+            color: var(--warning);
+            font-weight: 700;
+        }
+
+        .btn.btn-overwrite-active {
+            background: var(--warning);
+            border-color: var(--warning);
+            color: #fff;
         }
 
         .coverage-badge {
@@ -885,18 +931,21 @@
                     </div>
                     <div class="actions-row">
                         <button class="btn btn-secondary" id="import-reset-button" type="button">Xóa tất cả</button>
-                        <button class="btn btn-primary" id="import-process-button" type="button">Quét &amp; tách ngôn ngữ</button>
+                        <button class="btn btn-primary" id="import-process-button" type="button">Kiểm tra Importer/Seller</button>
+                        <button class="btn btn-success" id="import-convert-button" type="button" disabled>Bắt đầu chuyển HTML</button>
                     </div>
                 </div>
 
-                <div class="options-row">
-                    <strong>Thông tin công ty:</strong>
-                    <label class="checkbox-label"><input type="radio" name="import-company-mode" value="importer" checked> Importer</label>
-                    <label class="checkbox-label"><input type="radio" name="import-company-mode" value="seller"> Seller</label>
-                    <span style="color: var(--muted);">Áp dụng cho các ngôn ngữ ngoài EN/CZ trong tất cả DOCX.</span>
-                </div>
+                <p class="import-help"><strong>Quy tắc:</strong> Tool đọc Importer/Seller từ từng Word trước. File không có vai trò hoặc có cả hai vai trò sẽ yêu cầu chọn thủ công; chỉ khi mọi sản phẩm đã rõ vai trò mới được chuyển HTML. EN/CZ không thêm thông tin công ty.</p>
 
-                <p class="import-help"><strong>Quy tắc:</strong> EN/CZ chỉ gồm mô tả, thành phần, NTF xuống dòng và Storage; không thêm thông tin công ty. Các ngôn ngữ khác viết NTF liền bằng dấu phẩy và thêm Importer/Seller đã chọn.</p>
+                <div class="brand-role-panel" id="import-brand-role-panel" hidden>
+                    <h3>Chọn Importer/Seller theo brand</h3>
+                    <p>Mỗi brand chỉ cần chọn một lần. Kết quả được áp dụng cho toàn bộ sản phẩm trong brand.</p>
+                    <div class="table-wrap"><table>
+                        <thead><tr><th style="width: 220px;">Brand</th><th>Sản phẩm</th><th>Kết quả đọc Word</th><th style="width: 180px;">Vai trò</th></tr></thead>
+                        <tbody id="import-brand-role-body"></tbody>
+                    </table></div>
+                </div>
 
                 <div class="summary-grid" aria-label="Thống kê IMPORT LABELS">
                     <div class="summary-card"><span>Tổng DOCX</span><strong id="import-count-total">0</strong></div>
@@ -922,20 +971,21 @@
                                 <th style="width: 160px;">default_code</th>
                                 <th>Tên sản phẩm</th>
                                 <th style="width: 190px;">Ngôn ngữ</th>
+                                <th style="width: 170px;">Importer/Seller</th>
                                 <th style="width: 145px;">Trạng thái</th>
                                 <th>Chi tiết / nguyên nhân lỗi</th>
                                 <th style="width: 110px;">HTML</th>
                             </tr>
                         </thead>
                         <tbody id="import-results-body">
-                            <tr><td colspan="8" class="empty-state">Chưa có file DOCX nào được quét.</td></tr>
+                            <tr><td colspan="9" class="empty-state">Chưa có file DOCX nào được quét.</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="review-panel" id="import-review-panel">
                     <div>
-                        <h3>Đã xử lý xong — đang chờ bạn duyệt</h3>
+                        <h3>Kiểm tra vai trò công ty và kết quả</h3>
                         <p id="import-review-message">Kiểm tra kết quả trước khi tạo Excel.</p>
                     </div>
                     <div class="review-actions">
@@ -969,23 +1019,26 @@
                 <div class="upload-zone" style="margin-top: 16px;">
                     <div class="upload-copy">
                         <strong>Chọn ZIP hoặc DOCX chứa dữ liệu nhãn</strong>
-                        <span>Tự nhận dạng Summary Labels và IMPORT LABELS. ZIP được quét toàn bộ thư mục con.</span>
+                        <span>Quét mọi DOCX trong mọi thư mục; tự nhận dạng Summary Labels hoặc IMPORT LABELS theo nội dung Word.</span>
                         <input class="file-input" type="file" id="odoo-source-files" accept=".zip,.docx,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document" multiple>
                     </div>
                     <div class="actions-row">
                         <button class="btn btn-secondary" id="odoo-reset-button" type="button">Xóa kết quả</button>
-                        <button class="btn btn-primary" id="odoo-process-button" type="button">Kiểm tra Odoo &amp; chuyển HTML</button>
+                        <button class="btn btn-primary" id="odoo-process-button" type="button">Kiểm tra Odoo &amp; Importer/Seller</button>
+                        <button class="btn btn-success" id="odoo-convert-button" type="button" disabled>Bắt đầu chuyển HTML</button>
                     </div>
                 </div>
 
-                <div class="options-row">
-                    <strong>Thông tin công ty:</strong>
-                    <label class="checkbox-label"><input type="radio" name="odoo-company-mode" value="importer" checked> Importer</label>
-                    <label class="checkbox-label"><input type="radio" name="odoo-company-mode" value="seller"> Seller</label>
-                    <span style="color: var(--muted);">Chỉ áp dụng cho nguồn IMPORT LABELS và các ngôn ngữ ngoài EN/CZ.</span>
-                </div>
+                <p class="import-help"><strong>Quy tắc lọc:</strong> Tool tìm sản phẩm trong Odoo và đọc Importer/Seller từ Word trước khi chuyển HTML. Nếu không tìm thấy vai trò hoặc thấy cả hai, sản phẩm được báo ngay để chọn thủ công. Summary Labels không cần vai trò công ty; ô Odoo cũ chỉ bị thay thế khi bật “Ghi lại nội dung xung đột”.</p>
 
-                <p class="import-help"><strong>Quy tắc lọc:</strong> kiểm tra toàn bộ ZIP trước và chỉ chuyển những sản phẩm tìm thấy trong file Odoo. Sản phẩm không có trong Odoo được bỏ qua, không đưa vào báo cáo; sản phẩm đã khớp Odoo nhưng Word lỗi sẽ được báo rõ. Chỉ ghi vào ô ngôn ngữ đang trống; dữ liệu cũ được giữ nguyên.</p>
+                <div class="brand-role-panel" id="odoo-brand-role-panel" hidden>
+                    <h3>Chọn Importer/Seller theo brand</h3>
+                    <p>Các sản phẩm cùng brand được gom thành một dòng; lựa chọn được áp dụng cho toàn brand.</p>
+                    <div class="table-wrap"><table>
+                        <thead><tr><th style="width: 220px;">Brand</th><th>Sản phẩm Odoo</th><th>Kết quả đọc Word</th><th style="width: 180px;">Vai trò</th></tr></thead>
+                        <tbody id="odoo-brand-role-body"></tbody>
+                    </table></div>
+                </div>
 
                 <div class="summary-grid" aria-label="Thống kê ODOO FILL">
                     <div class="summary-card"><span>Sản phẩm có trong Odoo</span><strong id="odoo-count-total">0</strong></div>
@@ -1011,24 +1064,26 @@
                                 <th>Sản phẩm từ Word</th>
                                 <th style="width: 130px;">Code</th>
                                 <th>Sản phẩm Odoo</th>
+                                <th style="width: 170px;">Importer/Seller</th>
                                 <th style="width: 135px;">Ngôn ngữ</th>
                                 <th>Trạng thái</th>
                                 <th style="width: 110px;">Kết quả</th>
                             </tr>
                         </thead>
                         <tbody id="odoo-results-body">
-                            <tr><td colspan="7" class="empty-state">Chưa có dữ liệu để ghép.</td></tr>
+                            <tr><td colspan="8" class="empty-state">Chưa có dữ liệu để ghép.</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <div class="review-panel" id="odoo-review-panel">
                     <div>
-                        <h3>Đã quét xong — đang chờ bạn duyệt</h3>
+                        <h3>Kiểm tra vai trò công ty và kết quả Odoo</h3>
                         <p id="odoo-review-message">Có thể duyệt và lưu từng phần; dữ liệu đã lưu sẽ được dùng cho lượt tiếp theo.</p>
                     </div>
                     <div class="review-actions">
                         <button class="btn btn-secondary" id="odoo-error-log-button" type="button" disabled>Tải log lỗi (0)</button>
+                        <button class="btn btn-secondary" id="odoo-overwrite-conflicts-button" type="button" aria-pressed="false" disabled>Ghi lại nội dung xung đột (0)</button>
                         <button class="btn btn-secondary" id="odoo-approve-all-button" type="button" disabled>Duyệt tất cả</button>
                         <button class="btn btn-success" id="odoo-fill-button" type="button" disabled>Duyệt &amp; Lưu vào file Odoo</button>
                     </div>
@@ -1835,8 +1890,8 @@
             parseMetrics: window.multilingualWordParser.parseMetrics
         };
     </script>
-    <script src="import_labels.js?v=20261102-21"></script>
-    <script src="odoo_fill.js?v=20261102-12"></script>
+    <script src="import_labels.js?v=20261113-2"></script>
+    <script src="odoo_fill.js?v=20261113-2"></script>
 </body>
 
 </html>

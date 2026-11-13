@@ -4,6 +4,11 @@
     const REQUIRED_LANGUAGES = ['EN', 'FR', 'DE', 'CZ', 'PL', 'HU', 'ES', 'PT', 'IT', 'RO', 'SK', 'NL', 'DK', 'FI', 'SE'];
     const OPTIONAL_LANGUAGES = ['EE'];
     const ALL_OUTPUT_LANGUAGES = [...REQUIRED_LANGUAGES, ...OPTIONAL_LANGUAGES];
+    const COUNTRY_SUFFIXES = new Set([
+        'usa', 'kor', 'chn', 'twn', 'tha', 'mys', 'pak', 'jpn', 'vnm', 'idn', 'ind', 'phl', 'sgp',
+        'aus', 'nzl', 'can', 'mex', 'bra', 'gbr', 'irl', 'tur', 'ukr', 'are', 'uae', 'cze', 'deu',
+        'fra', 'ita', 'esp', 'prt', 'pol', 'nld', 'bel', 'aut', 'che', 'dnk', 'fin', 'swe', 'nor'
+    ]);
     const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
     const HANDLE_DATABASE = 'word-zip-odoo-working-file';
     const HANDLE_STORE = 'handles';
@@ -17,12 +22,17 @@
         workbookSheetName: '',
         headerMap: new Map(),
         odooRows: [],
+        prepared: [],
+        roleGroups: [],
+        brandGroups: [],
         groups: [],
         errors: [],
         ignoredCount: 0,
         processed: false,
+        phase: 'idle',
         processing: false,
         saving: false,
+        overwriteConflicts: false,
         previewGroupId: null,
         previewLanguage: '',
         previewMode: 'visual',
@@ -56,16 +66,18 @@
             .trim();
     }
 
+    function normalizeProductMatchName(value) {
+        const parts = normalizeName(value).split(' ').filter(Boolean);
+        while (parts.length && COUNTRY_SUFFIXES.has(parts[parts.length - 1])) parts.pop();
+        return parts.join(' ');
+    }
+
     function normalizeReference(value) {
         return clean(value).toLowerCase().replace(/[^a-z0-9-]/g, '');
     }
 
     function fileStem(value) {
         return clean(String(value || '').split('/').pop().split('\\').pop()).replace(/\.docx$/i, '');
-    }
-
-    function companyMode() {
-        return document.querySelector('input[name="odoo-company-mode"]:checked')?.value || 'importer';
     }
 
     function languageOrder(language) {
@@ -167,6 +179,7 @@
                 reference,
                 category,
                 normalizedName: normalizeName(name),
+                normalizedMatchName: normalizeProductMatchName(name),
                 normalizedReference: normalizeReference(reference),
                 existingHtml
             };
@@ -297,33 +310,102 @@
         });
     }
 
-    function folderMonthTimestamp(sourcePath) {
+    function validUtcDate(year, month, day) {
+        const timestamp = Date.UTC(year, month - 1, day);
+        const date = new Date(timestamp);
+        return date.getUTCFullYear() === year
+            && date.getUTCMonth() === month - 1
+            && date.getUTCDate() === day
+            ? timestamp
+            : 0;
+    }
+
+    function folderVersionInfo(sourcePath) {
         const parts = String(sourcePath || '').replace(/\\/g, '/').split('/');
         if (parts.length) parts.pop();
         const monthNames = {
             january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
             july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
         };
-        let newest = 0;
+        let newest = { timestamp: 0, label: '', precision: 0 };
+        const remember = (timestamp, label, precision) => {
+            if (timestamp > newest.timestamp || (timestamp === newest.timestamp && precision > newest.precision)) {
+                newest = { timestamp, label, precision };
+            }
+        };
         for (let index = 0; index < parts.length; index += 1) {
             const part = clean(parts[index]);
+            // Supplier folders use SY + YYMMDD, optionally followed by a range suffix,
+            // for example SY261020 or SY250617A~C. This date is the authoritative
+            // label version and must outrank the DOCX modified timestamp.
+            const syPattern = /(?:^|\W)SY\s*[-_]?\s*(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?=\D|$)/gi;
+            let syMatch;
+            while ((syMatch = syPattern.exec(part)) !== null) {
+                const year = 2000 + Number(syMatch[1]);
+                const month = Number(syMatch[2]);
+                const day = Number(syMatch[3]);
+                const timestamp = validUtcDate(year, month, day);
+                if (timestamp) remember(timestamp, `SY${syMatch[1]}${syMatch[2]}${syMatch[3]}`, 2);
+            }
+            // Vietnamese containers use SSRO/SSSRO + YYNNN, where YY is the
+            // year and NNN is the container sequence, for example 26005.
+            // The sequence is authoritative even when DOCX modified dates differ.
+            const containerPattern = /(?:^|\W)S{2,3}RO\s*[-_]?\s*(\d{2})(\d{3})(?=\D|$)/gi;
+            let containerMatch;
+            while ((containerMatch = containerPattern.exec(part)) !== null) {
+                const year = 2000 + Number(containerMatch[1]);
+                const sequence = Number(containerMatch[2]);
+                if (sequence > 0) {
+                    const timestamp = Date.UTC(year, 0, 1) + sequence;
+                    remember(timestamp, `CONT ${containerMatch[1]}${containerMatch[2]}`, 2);
+                }
+            }
+            // Korean batches are grouped as "5th and 6th container",
+            // "7A,B,C Container" and "8A,...,8E container". The highest
+            // container number is the newest batch; letters belong to one batch.
+            if (/\bcontainers?\b/i.test(part)) {
+                const koreanContainerNumbers = [...part.matchAll(/\b(\d{1,2})(?:st|nd|rd|th|[a-z])?\b/gi)]
+                    .map(candidate => Number(candidate[1]))
+                    .filter(Number.isFinite);
+                const newestKoreanContainer = Math.max(0, ...koreanContainerNumbers);
+                if (newestKoreanContainer > 0) {
+                    const timestamp = Date.UTC(2000, 0, 1) + newestKoreanContainer;
+                    remember(timestamp, `CONT KR ${newestKoreanContainer}`, 2);
+                }
+            }
             let match = part.match(/(?:^|\D)(0?[1-9]|1[0-2])\s*[_\-.]\s*(20\d{2})(?:\D|$)/);
-            if (match) newest = Math.max(newest, Date.UTC(Number(match[2]), Number(match[1]) - 1, 1));
+            if (match) remember(Date.UTC(Number(match[2]), Number(match[1]) - 1, 1), `${match[1].padStart(2, '0')}/${match[2]}`, 1);
             match = part.match(/(?:^|\D)(20\d{2})\s*[_\-.]\s*(0?[1-9]|1[0-2])(?:\D|$)/);
-            if (match) newest = Math.max(newest, Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
+            if (match) remember(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1), `${match[2].padStart(2, '0')}/${match[1]}`, 1);
             if (/^(0?[1-9]|1[0-2])$/.test(part) && /^(20\d{2})(?:\D|$)/.test(clean(parts[index + 1]))) {
-                newest = Math.max(newest, Date.UTC(Number(clean(parts[index + 1]).match(/^(20\d{2})/)[1]), Number(part) - 1, 1));
+                const year = clean(parts[index + 1]).match(/^(20\d{2})/)[1];
+                remember(Date.UTC(Number(year), Number(part) - 1, 1), `${part.padStart(2, '0')}/${year}`, 1);
             }
             const monthNameMatch = part.match(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\s+(20\d{2})\b/i);
             if (monthNameMatch) {
-                newest = Math.max(newest, Date.UTC(Number(monthNameMatch[2]), monthNames[monthNameMatch[1].toLowerCase()] - 1, 1));
+                const month = monthNames[monthNameMatch[1].toLowerCase()];
+                remember(Date.UTC(Number(monthNameMatch[2]), month - 1, 1), `${String(month).padStart(2, '0')}/${monthNameMatch[2]}`, 1);
             }
         }
         return newest;
     }
 
     function descriptorVersionTimestamp(descriptor) {
-        return folderMonthTimestamp(descriptor.sourcePath) || Number(descriptor.sourceTimestamp || 0);
+        return folderVersionInfo(descriptor.sourcePath).timestamp || Number(descriptor.sourceTimestamp || 0);
+    }
+
+    function descriptorExplicitVersionRank(descriptor) {
+        return folderVersionInfo(descriptor.sourcePath).timestamp ? 1 : 0;
+    }
+
+    function descriptorVersionLabel(descriptor) {
+        return folderVersionInfo(descriptor.sourcePath).label || 'theo ngày sửa DOCX';
+    }
+
+    function descriptorDraftRank(descriptor) {
+        const parts = String(descriptor.sourcePath || '').replace(/\\/g, '/').split('/');
+        if (parts.length) parts.pop();
+        return parts.some(part => /(?:^|\W)draft(?:\W|$)/i.test(part)) ? 0 : 1;
     }
 
     function preferCzSevenByFive(descriptors) {
@@ -436,11 +518,11 @@
         };
     }
 
-    async function convertImport(descriptor, index, inspection = null, preparedFile = null, fallbackCandidates = []) {
+    async function convertImport(descriptor, index, companyRole, inspection = null, preparedFile = null, fallbackCandidates = []) {
         const file = preparedFile || await descriptorFile(descriptor);
         let result;
         try {
-            result = await window.importLabelsTool.convertFile(file, index, companyMode(), inspection);
+            result = await window.importLabelsTool.convertFile(file, index, companyRole, inspection);
         } catch (error) {
             if (!/Không tìm thấy NTF dùng chung/i.test(error.message || '') || !fallbackCandidates.length) throw error;
             const nutritionFallbacks = [];
@@ -458,7 +540,7 @@
                     result = await window.importLabelsTool.convertFile(
                         file,
                         index,
-                        companyMode(),
+                        companyRole,
                         inspection,
                         nutritionFallbacks
                     );
@@ -486,12 +568,25 @@
 
     function effectiveHtml(group, language) {
         const existing = group.selectedRow?.existingHtml?.[language];
-        return existing || group.cells[language] || '';
+        const incoming = group.cells[language];
+        if (state.overwriteConflicts && existing && incoming && clean(existing) !== clean(incoming)) return incoming;
+        return existing || incoming || '';
+    }
+
+    function newLanguages(group) {
+        if (!group.selectedRow) return [];
+        return ALL_OUTPUT_LANGUAGES.filter(language => group.cells[language] && !group.selectedRow.existingHtml[language]);
     }
 
     function writableLanguages(group) {
+        const writable = newLanguages(group);
+        if (!state.overwriteConflicts) return writable;
+        return [...new Set([...writable, ...conflictLanguages(group)])];
+    }
+
+    function existingLanguages(group) {
         if (!group.selectedRow) return [];
-        return ALL_OUTPUT_LANGUAGES.filter(language => group.cells[language] && !group.selectedRow.existingHtml[language]);
+        return ALL_OUTPUT_LANGUAGES.filter(language => group.selectedRow.existingHtml[language]);
     }
 
     function conflictLanguages(group) {
@@ -545,14 +640,14 @@
             }
         }
 
-        const normalizedName = normalizeName(name);
+        const normalizedName = normalizeProductMatchName(name);
         if (!normalizedName) return null;
-        const exactMatches = state.odooRows.filter(row => row.normalizedName === normalizedName);
+        const exactMatches = state.odooRows.filter(row => (row.normalizedMatchName || row.normalizedName) === normalizedName);
         if (exactMatches.length === 1) {
             return { row: exactMatches[0], mode: 'name', detail: 'Đã tìm thấy chính xác tên sản phẩm trong Odoo.' };
         }
 
-        const suggestions = state.odooRows.map(row => ({ row, score: similarity(normalizedName, row.normalizedName) }))
+        const suggestions = state.odooRows.map(row => ({ row, score: similarity(normalizedName, row.normalizedMatchName || row.normalizedName) }))
             .sort((a, b) => b.score - a.score);
         const best = suggestions[0];
         const second = suggestions[1];
@@ -604,6 +699,8 @@
             if (!byProductLanguage.has(key)) byProductLanguage.set(key, []);
             byProductLanguage.get(key).push({
                 ...item,
+                draftRank: descriptorDraftRank(item.descriptor),
+                explicitVersionRank: descriptorExplicitVersionRank(item.descriptor),
                 versionTimestamp: descriptorVersionTimestamp(item.descriptor),
                 sourceTimestamp: Number(item.descriptor.sourceTimestamp || 0)
             });
@@ -611,6 +708,8 @@
         const selected = [];
         byProductLanguage.forEach(items => {
             items.sort((left, right) =>
+                right.draftRank - left.draftRank ||
+                right.explicitVersionRank - left.explicitVersionRank ||
                 right.versionTimestamp - left.versionTimestamp ||
                 right.sourceTimestamp - left.sourceTimestamp ||
                 right.index - left.index
@@ -618,6 +717,140 @@
             selected.push({ ...items[0], fallbackCandidates: items.slice(1) });
         });
         return selected.sort((left, right) => left.index - right.index);
+    }
+
+    function buildCompanyRoleGroups(selected) {
+        const groups = new Map();
+        for (const item of selected) {
+            const row = item.preflight.row;
+            const key = String(row.rowNumber);
+            if (!groups.has(key)) {
+                const brandInfo = window.importLabelsTool.inferBrand(
+                    item.descriptor.sourcePath,
+                    item.descriptor.fileName,
+                    item.preflight.name || row.name,
+                    row.rowNumber
+                );
+                groups.set(key, {
+                    id: `odoo-role-${key}`,
+                    row,
+                    name: item.preflight.name || row.name,
+                    code: item.preflight.code || row.reference,
+                    brand: brandInfo.name,
+                    brandSource: brandInfo.source,
+                    needsBrandName: brandInfo.needsName,
+                    items: [],
+                    roleRequired: false,
+                    companyRole: '',
+                    companyRoleSource: '',
+                    detail: 'Summary Labels — không cần thông tin công ty.'
+                });
+            }
+            groups.get(key).items.push(item);
+        }
+
+        for (const group of groups.values()) {
+            const importItems = group.items.filter(item => !item.preflight.identity);
+            if (!importItems.length) continue;
+            group.roleRequired = true;
+            const detections = importItems.map(item => item.preflight.inspection?.companyRole || { role: '', status: 'missing' });
+            const roles = [...new Set(detections.map(detection => detection.role).filter(Boolean))];
+            const ambiguous = detections.some(detection => detection.status === 'ambiguous') || roles.length > 1;
+            if (ambiguous) {
+                group.detail = 'Word có cả Importer và Seller hoặc các file của cùng sản phẩm mâu thuẫn; cần chọn thủ công.';
+            } else if (roles.length === 1) {
+                group.companyRole = roles[0];
+                group.companyRoleSource = 'detected';
+                const missingCount = detections.filter(detection => !detection.role).length;
+                group.detail = missingCount
+                    ? `Đọc được ${group.companyRole === 'seller' ? 'Seller' : 'Importer'} từ file Word khác của cùng sản phẩm; áp dụng cho ${missingCount} file chưa ghi vai trò.`
+                    : `Đọc từ Word: ${group.companyRole === 'seller' ? 'Seller' : 'Importer'}.`;
+            } else {
+                group.detail = 'Không tìm thấy nhãn Importer hoặc Seller trong Word; cần chọn thủ công.';
+            }
+            importItems.forEach(item => { item.companyRole = group.companyRole; });
+        }
+        return [...groups.values()];
+    }
+
+    function buildOdooBrandGroups(productGroups) {
+        const brands = new Map();
+        for (const productGroup of productGroups.filter(group => group.roleRequired)) {
+            const key = normalizeName(productGroup.brand) || `unknown-${productGroup.row.rowNumber}`;
+            if (!brands.has(key)) {
+                brands.set(key, {
+                    id: `odoo-brand-${brands.size + 1}`,
+                    brand: productGroup.brand,
+                    brandSource: productGroup.brandSource,
+                    needsName: productGroup.needsBrandName,
+                    products: [],
+                    companyRole: '',
+                    companyRoleSource: '',
+                    detail: ''
+                });
+            }
+            brands.get(key).products.push(productGroup);
+        }
+        for (const brand of brands.values()) {
+            const detections = brand.products.flatMap(product => product.items
+                .filter(item => !item.preflight.identity)
+                .map(item => item.preflight.inspection?.companyRole || { role: '', status: 'missing' }));
+            const roles = [...new Set(detections.map(detection => detection.role).filter(Boolean))];
+            const ambiguous = detections.some(detection => detection.status === 'ambiguous') || roles.length > 1;
+            if (ambiguous) {
+                brand.detail = 'Các Word trong brand có cả Importer và Seller; cần chọn một vai trò cho toàn brand.';
+            } else if (roles.length === 1) {
+                brand.companyRole = roles[0];
+                brand.companyRoleSource = 'detected';
+                const missingCount = detections.filter(detection => !detection.role).length;
+                brand.detail = missingCount
+                    ? `Đọc được ${brand.companyRole === 'seller' ? 'Seller' : 'Importer'} từ Word; áp dụng cho ${missingCount} file cùng brand chưa ghi vai trò.`
+                    : `Toàn bộ Word trong brand thống nhất: ${brand.companyRole === 'seller' ? 'Seller' : 'Importer'}.`;
+            } else {
+                brand.detail = 'Không Word nào trong brand ghi Importer/Seller; cần chọn một lần cho toàn brand.';
+            }
+            brand.products.forEach(product => {
+                product.companyRole = brand.companyRole;
+                product.companyRoleSource = brand.companyRoleSource;
+                product.detail = brand.detail;
+                product.items.filter(item => !item.preflight.identity).forEach(item => { item.companyRole = brand.companyRole; });
+            });
+        }
+        return [...brands.values()].sort((left, right) => left.brand.localeCompare(right.brand, undefined, { numeric: true }));
+    }
+
+    function unresolvedCompanyRoleGroups() {
+        return state.brandGroups.filter(group => group.needsName || !['importer', 'seller'].includes(group.companyRole));
+    }
+
+    function setManualBrandRole(group, role) {
+        group.companyRole = role;
+        group.companyRoleSource = role ? 'manual' : '';
+        group.detail = role
+            ? `Đã chọn thủ công ${role === 'seller' ? 'Seller' : 'Importer'} cho toàn brand.`
+            : 'Cần chọn Importer hoặc Seller cho brand.';
+        group.products.forEach(product => {
+            product.companyRole = role;
+            product.companyRoleSource = group.companyRoleSource;
+            product.detail = group.detail;
+            product.items.filter(item => !item.preflight.identity).forEach(item => { item.companyRole = role; });
+        });
+        renderResults();
+        renderOdooBrandGroups();
+    }
+
+    function setOdooBrandName(group, value) {
+        const brand = clean(value);
+        group.needsName = !brand;
+        if (brand) {
+            group.brand = brand;
+            group.brandSource = 'manual';
+            group.products.forEach(product => {
+                product.brand = brand;
+                product.brandSource = 'manual';
+            });
+        }
+        updateSummary();
     }
 
     async function preflightDescriptor(descriptor) {
@@ -628,20 +861,24 @@
         const identity = summaryIdentity(descriptor.fileName);
         const name = identity ? identity.productName : importNameFromFile(descriptor.fileName);
         const code = identity ? identity.productCode : (fileStem(descriptor.fileName).match(/(?:^|[\s_-])(\d+(?:-\d+)?)(?=[\s_-]|$)/)?.[1] || '');
-        const match = matchOdooProduct(name, code, descriptor.sourcePath || descriptor.fileName);
-        if (match) return { identity, name, code, ...match };
-        if (identity) return null;
+        const fileNameMatch = matchOdooProduct(name, code, descriptor.sourcePath || descriptor.fileName);
+        if (identity) return fileNameMatch ? { identity, name, code, ...fileNameMatch } : null;
         try {
             const preparedFile = await descriptorFile(descriptor);
             const inspection = await window.importLabelsTool.inspectFile(preparedFile);
-            const titleMatch = matchOdooProduct(inspection.name, inspection.defaultCode, descriptor.sourcePath || descriptor.fileName);
-            return titleMatch ? {
+            // Folder names vary by supplier. Decide by Word content instead:
+            // import labels must contain at least one real (EN)/(FR)/... block.
+            // Plain ingredient/specification files are silently ignored.
+            if (!inspection.blocks?.length) return null;
+            const contentMatch = fileNameMatch
+                || matchOdooProduct(inspection.name, inspection.defaultCode, descriptor.sourcePath || descriptor.fileName);
+            return contentMatch ? {
                 identity: null,
                 name: inspection.name,
                 code: inspection.defaultCode,
                 inspection,
                 preparedFile,
-                ...titleMatch
+                ...contentMatch
             } : null;
         } catch (_error) {
             return null;
@@ -661,14 +898,14 @@
             setGroupMatch(group, exactReference[0], 'reference', `Khớp chính xác Internal Reference: ${exactReference[0].reference}.`);
             return;
         }
-        const normalizedName = normalizeName(group.name);
-        const exactName = state.odooRows.filter(row => row.normalizedName && row.normalizedName === normalizedName);
+        const normalizedName = normalizeProductMatchName(group.name);
+        const exactName = state.odooRows.filter(row => (row.normalizedMatchName || row.normalizedName) === normalizedName);
         if (exactName.length === 1) {
             group.matchCandidates = exactName;
             setGroupMatch(group, exactName[0], 'name', 'Khớp chính xác theo tên sản phẩm. Hãy kiểm tra rồi tick duyệt.');
             return;
         }
-        const suggestions = state.odooRows.map(row => ({ row, score: similarity(normalizedName, row.normalizedName) }))
+        const suggestions = state.odooRows.map(row => ({ row, score: similarity(normalizedName, row.normalizedMatchName || row.normalizedName) }))
             .sort((a, b) => b.score - a.score);
         group.matchCandidates = suggestions.slice(0, 12).map(item => item.row);
         if (suggestions[0]?.score >= 0.72) {
@@ -702,6 +939,10 @@
 
         state.processing = true;
         state.processed = false;
+        state.phase = 'scanning';
+        state.prepared = [];
+        state.roleGroups = [];
+        state.brandGroups = [];
         state.groups = [];
         state.errors = [];
         state.ignoredCount = 0;
@@ -727,10 +968,37 @@
             }
             const selected = preferLatestPrepared(prepared);
             state.ignoredCount += prepared.length - selected.length;
-            const groups = new Map();
-            for (let selectedIndex = 0; selectedIndex < selected.length; selectedIndex += 1) {
-                const { descriptor, preflight, index, fallbackCandidates } = selected[selectedIndex];
-                el.processButton.textContent = `Đang xử lý ${selectedIndex + 1}/${selected.length}…`;
+            state.prepared = selected;
+            state.roleGroups = buildCompanyRoleGroups(selected);
+            state.brandGroups = buildOdooBrandGroups(state.roleGroups);
+            state.phase = 'role-review';
+        } finally {
+            state.processing = false;
+            el.processButton.disabled = false;
+            el.processButton.textContent = 'Kiểm tra Odoo & Importer/Seller';
+            renderResults();
+        }
+    }
+
+    async function convertPreparedSources() {
+        if (state.processing || state.phase !== 'role-review') return;
+        const unresolved = unresolvedCompanyRoleGroups();
+        if (unresolved.length) {
+            alert(`Còn ${unresolved.length} brand chưa có tên hoặc chưa chọn Importer/Seller.`);
+            return;
+        }
+        if (!state.prepared.length) return;
+        state.processing = true;
+        state.processed = false;
+        state.phase = 'converting';
+        state.groups = [];
+        el.convertButton.disabled = true;
+        renderResults();
+        const groups = new Map();
+        try {
+            for (let selectedIndex = 0; selectedIndex < state.prepared.length; selectedIndex += 1) {
+                const { descriptor, preflight, index, fallbackCandidates, companyRole } = state.prepared[selectedIndex];
+                el.convertButton.textContent = `Đang chuyển HTML ${selectedIndex + 1}/${state.prepared.length}…`;
                 await new Promise(resolve => setTimeout(resolve, 0));
                 try {
                     const converted = preflight.identity
@@ -738,6 +1006,7 @@
                         : await convertImport(
                             descriptor,
                             index + 1,
+                            companyRole,
                             preflight.inspection,
                             preflight.preparedFile,
                             fallbackCandidates
@@ -751,6 +1020,11 @@
                         preflight.mode,
                         preflight.detail
                     );
+                    if (converted.kind === 'import') {
+                        const roleGroup = state.roleGroups.find(candidate => candidate.row.rowNumber === preflight.row.rowNumber);
+                        group.companyRole = companyRole;
+                        group.companyRoleSource = roleGroup?.companyRoleSource || 'detected';
+                    }
                     let acceptedLanguage = false;
                     for (const [language, html] of Object.entries(converted.languages || {})) {
                         acceptedLanguage = addLanguage(group, language, html, {
@@ -761,7 +1035,9 @@
                             versionTimestamp: descriptorVersionTimestamp(descriptor)
                         }) || acceptedLanguage;
                     }
-                    if (acceptedLanguage) group.sourceFiles.add(descriptor.sourcePath || descriptor.fileName);
+                    if (acceptedLanguage) {
+                        group.sourceFiles.add(`[Bản ${descriptorVersionLabel(descriptor)}] ${descriptor.sourcePath || descriptor.fileName}`);
+                    }
                     if (acceptedLanguage && converted.nutritionFallbackPath) {
                         group.sourceFiles.add(`NTF từ bản cũ: ${converted.nutritionFallbackPath}`);
                     }
@@ -779,11 +1055,11 @@
                 }
             }
             state.groups = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+            state.phase = 'converted';
             state.processed = true;
         } finally {
             state.processing = false;
-            el.processButton.disabled = false;
-            el.processButton.textContent = 'Kiểm tra Odoo & chuyển HTML';
+            el.convertButton.textContent = 'Bắt đầu chuyển HTML';
             renderResults();
         }
     }
@@ -805,7 +1081,15 @@
         if (!group.selectedRow) return { className: 'error', text: 'Chưa ghép Odoo', detail: group.matchDetail };
         if (group.saved) return { className: 'success', text: 'Đã lưu', detail: `Đã ghi trực tiếp vào ${state.workbookFileName}.` };
         const writable = writableLanguages(group);
+        const newCells = newLanguages(group);
         const conflicts = conflictLanguages(group);
+        if (state.overwriteConflicts && conflicts.length) {
+            return {
+                className: 'processing',
+                text: 'Sẵn sàng ghi đè',
+                detail: `Sẽ thêm ${newCells.length} ô trống và thay thế ${conflicts.length} ô xung đột: ${conflicts.join(', ')}.`
+            };
+        }
         if (!writable.length && conflicts.length) return { className: 'error', text: 'Chỉ có xung đột', detail: `Giữ dữ liệu cũ tại: ${conflicts.join(', ')}.` };
         if (!writable.length) return { className: 'success', text: 'Không có ô mới', detail: 'Các ngôn ngữ trong ZIP đã có sẵn trong Odoo.' };
         if (conflicts.length) return { className: 'processing', text: 'Có xung đột', detail: `Sẽ thêm ${writable.length} ô trống; giữ dữ liệu cũ tại ${conflicts.join(', ')}.` };
@@ -816,7 +1100,94 @@
         };
     }
 
+    function renderOdooBrandGroups() {
+        const visible = state.phase === 'role-review' && state.brandGroups.length > 0;
+        el.brandPanel.hidden = !visible;
+        el.brandBody.innerHTML = '';
+        if (!visible) return;
+        state.brandGroups.forEach((group, index) => {
+            const row = document.createElement('tr');
+            const productNames = group.products.map(product => product.row.name);
+            const brandControl = group.needsName
+                ? `<input class="brand-name-input" type="text" placeholder="Nhập tên brand" aria-label="Tên brand nhóm ${index + 1}">`
+                : `<div class="file-name">${escapeHtml(group.brand)}</div><div class="source-name">${group.brandSource === 'folder' ? 'Lấy từ thư mục' : group.brandSource === 'manual' ? 'Nhập thủ công' : 'Suy từ tên sản phẩm'}</div>`;
+            row.innerHTML = `
+                <td>${brandControl}</td>
+                <td><strong>${group.products.length}</strong><div class="source-name">${escapeHtml(productNames.slice(0, 4).join(' • '))}${productNames.length > 4 ? ` • +${productNames.length - 4} sản phẩm` : ''}</div></td>
+                <td>${escapeHtml(group.detail)}</td>
+                <td class="brand-role-choice"></td>`;
+            if (group.needsName) {
+                const input = row.querySelector('.brand-name-input');
+                input.addEventListener('input', event => setOdooBrandName(group, event.target.value));
+                input.addEventListener('blur', renderResults);
+            }
+            const roleCell = row.querySelector('.brand-role-choice');
+            if (group.companyRoleSource === 'detected') {
+                roleCell.innerHTML = `<span class="status-badge status-success">${group.companyRole === 'seller' ? 'Seller' : 'Importer'}</span><div class="source-name">Tự động theo brand</div>`;
+            } else {
+                const select = document.createElement('select');
+                select.className = 'company-role-select';
+                select.innerHTML = '<option value="">— Chọn vai trò —</option><option value="importer">Importer</option><option value="seller">Seller</option>';
+                select.value = group.companyRole || '';
+                select.addEventListener('change', () => setManualBrandRole(group, select.value));
+                roleCell.appendChild(select);
+            }
+            el.brandBody.appendChild(row);
+        });
+    }
+
+    function renderCompanyRoleReview() {
+        renderOdooBrandGroups();
+        el.resultsBody.innerHTML = '';
+        if (!state.roleGroups.length && !state.errors.length) {
+            el.resultsBody.innerHTML = '<tr><td colspan="8" class="empty-state">Không có sản phẩm nào trong ZIP khớp với file Odoo.</td></tr>';
+            updateSummary();
+            return;
+        }
+        for (const group of state.roleGroups) {
+            const sourceFiles = group.items.map(item => item.descriptor.sourcePath || item.descriptor.fileName);
+            const languages = [...new Set(group.items.flatMap(item => {
+                if (item.preflight.identity?.languages?.length) return item.preflight.identity.languages;
+                return (item.preflight.inspection?.blocks || []).map(block => block.language);
+            }))].sort((left, right) => languageOrder(left) - languageOrder(right));
+            const row = document.createElement('tr');
+            const roleReady = !group.roleRequired || ['importer', 'seller'].includes(group.companyRole);
+            row.innerHTML = `
+                <td class="odoo-approve">—</td>
+                <td><div class="file-name">${escapeHtml(group.name)}</div><div class="source-name">${escapeHtml(sourceFiles.join(' • '))}</div></td>
+                <td>${escapeHtml(group.code || group.row.reference || '—')}</td>
+                <td><div class="file-name">${escapeHtml(group.row.name)}</div><div class="odoo-match-note">${escapeHtml(group.items[0]?.preflight.detail || '')}</div></td>
+                <td class="odoo-company-role"></td>
+                <td><span class="coverage-badge incomplete">${escapeHtml(languages.join(', ') || '—')}</span></td>
+                <td><span class="status-badge status-${roleReady ? 'success' : 'error'}">${roleReady ? 'Vai trò đã xác định' : 'Cần chọn vai trò'}</span><div class="odoo-match-note">${escapeHtml(group.detail)}</div></td>
+                <td>—</td>`;
+            const roleCell = row.querySelector('.odoo-company-role');
+            if (!group.roleRequired) {
+                roleCell.innerHTML = '<span class="status-badge">Không áp dụng</span><div class="source-name">Summary Labels</div>';
+            } else {
+                const roleText = group.companyRole === 'seller' ? 'Seller' : group.companyRole === 'importer' ? 'Importer' : 'Chưa chọn';
+                roleCell.innerHTML = `<div class="file-name">${escapeHtml(group.brand || 'Không xác định')}</div><span class="status-badge status-${group.companyRole ? 'success' : 'error'}">${roleText}</span>`;
+            }
+            el.resultsBody.appendChild(row);
+        }
+        for (const error of state.errors) {
+            const row = document.createElement('tr');
+            row.className = 'row-error';
+            const inputLocation = error.sourcePath
+                ? `${error.sourceName || 'ZIP'} > ${error.sourcePath}`
+                : (error.inputPath || error.fileName);
+            row.innerHTML = `<td>—</td><td><div class="file-name">${escapeHtml(error.productName || error.fileName)}</div><div class="source-name">Vị trí input: ${escapeHtml(inputLocation)}</div></td><td>${escapeHtml(error.productCode || '—')}</td><td>—</td><td>—</td><td>—</td><td><span class="status-badge status-error">! Lỗi kiểm tra</span><div class="odoo-match-note">${escapeHtml(error.detail)}</div></td><td>—</td>`;
+            el.resultsBody.appendChild(row);
+        }
+        updateSummary();
+    }
+
     function renderResults() {
+        if (state.phase === 'role-review') {
+            renderCompanyRoleReview();
+            return;
+        }
+        renderOdooBrandGroups();
         el.resultsBody.innerHTML = '';
         if (!state.groups.length && !state.errors.length) {
             const emptyMessage = state.processing
@@ -824,7 +1195,7 @@
                 : state.processed
                     ? 'Không có sản phẩm nào trong ZIP khớp với file Odoo.'
                     : 'Chưa có dữ liệu để kiểm tra.';
-            el.resultsBody.innerHTML = `<tr><td colspan="7" class="empty-state">${emptyMessage}</td></tr>`;
+            el.resultsBody.innerHTML = `<tr><td colspan="8" class="empty-state">${emptyMessage}</td></tr>`;
             updateSummary();
             return;
         }
@@ -833,6 +1204,8 @@
             const missing = missingLanguages(group);
             const available = REQUIRED_LANGUAGES.length - missing.length;
             const writable = writableLanguages(group);
+            const newCells = newLanguages(group);
+            const existing = existingLanguages(group);
             const conflicts = conflictLanguages(group);
             const status = groupStatus(group);
             const row = document.createElement('tr');
@@ -841,7 +1214,8 @@
                 <td><div class="file-name">${escapeHtml(group.name || 'Không có tên')}</div><div class="source-name">${escapeHtml([...group.sourceFiles].join(' • '))}</div></td>
                 <td>${escapeHtml(group.code || '—')}</td>
                 <td><select class="odoo-match-select">${matchOptions(group)}</select><div class="odoo-match-note">${escapeHtml(group.matchDetail)}</div></td>
-                <td><span class="coverage-badge ${missing.length ? 'incomplete' : ''}">${available}/15</span><div class="odoo-match-note">${writable.length ? `+${writable.length} ô mới` : 'Không có ô mới'}</div>${missing.length ? `<div class="odoo-missing">${escapeHtml(missing.join(', '))}</div>` : ''}${conflicts.length ? `<div class="odoo-missing">Xung đột: ${escapeHtml(conflicts.join(', '))}</div>` : ''}</td>
+                <td>${group.companyRole ? `<span class="status-badge status-success">${group.companyRole === 'seller' ? 'Seller' : 'Importer'}</span><div class="source-name">${group.companyRoleSource === 'manual' ? 'Chọn thủ công' : 'Đọc từ Word'}</div>` : '<span class="status-badge">Không áp dụng</span><div class="source-name">Summary Labels</div>'}</td>
+                <td><span class="coverage-badge ${missing.length ? 'incomplete' : ''}">${available}/15</span><div class="odoo-match-note">${newCells.length ? `+${newCells.length} ô mới` : 'Không có ô trống mới'}</div>${existing.length ? `<div class="odoo-existing">Đã có dữ liệu: ${escapeHtml(existing.join(', '))}</div>` : ''}${missing.length ? `<div class="odoo-missing">Còn thiếu: ${escapeHtml(missing.join(', '))}</div>` : ''}${conflicts.length ? (state.overwriteConflicts ? `<div class="odoo-overwrite">Sẽ ghi đè bằng nội dung mới: ${escapeHtml(conflicts.join(', '))}</div>` : `<div class="odoo-missing">Xung đột — giữ dữ liệu cũ: ${escapeHtml(conflicts.join(', '))}</div>`) : ''}</td>
                 <td><span class="status-badge status-${status.className}">${escapeHtml(status.text)}</span><div class="odoo-match-note">${escapeHtml(status.detail)}</div></td>
                 <td class="action-cell"><button class="small-btn" type="button">Xem kết quả</button></td>`;
 
@@ -871,17 +1245,41 @@
             const inputLocation = error.sourcePath
                 ? `${error.sourceName || 'ZIP'} > ${error.sourcePath}`
                 : (error.inputPath || error.fileName);
-            row.innerHTML = `<td>—</td><td><div class="file-name">${escapeHtml(error.productName || error.fileName)}</div><div class="source-name">Vị trí input: ${escapeHtml(inputLocation)}</div></td><td>${escapeHtml(error.productCode || '—')}</td><td>${error.productName ? 'Đã tìm thấy trong Odoo' : '—'}</td><td>—</td><td><span class="status-badge status-error">! Lỗi chuyển đổi</span><div class="odoo-match-note">${escapeHtml(error.detail)}</div></td><td>—</td>`;
+            row.innerHTML = `<td>—</td><td><div class="file-name">${escapeHtml(error.productName || error.fileName)}</div><div class="source-name">Vị trí input: ${escapeHtml(inputLocation)}</div></td><td>${escapeHtml(error.productCode || '—')}</td><td>${error.productName ? 'Đã tìm thấy trong Odoo' : '—'}</td><td>—</td><td>—</td><td><span class="status-badge status-error">! Lỗi chuyển đổi</span><div class="odoo-match-note">${escapeHtml(error.detail)}</div></td><td>—</td>`;
             el.resultsBody.appendChild(row);
         }
         updateSummary();
     }
 
     function updateSummary() {
+        if (state.phase === 'role-review') {
+            const unresolved = unresolvedCompanyRoleGroups();
+            const required = state.roleGroups.filter(group => group.roleRequired);
+            const detected = state.brandGroups.filter(group => group.companyRoleSource === 'detected' && !group.needsName).length;
+            const manual = state.brandGroups.filter(group => group.companyRoleSource === 'manual' && !group.needsName).length;
+            el.countTotal.textContent = state.roleGroups.length;
+            el.countReady.textContent = '0';
+            el.countReview.textContent = unresolved.length;
+            el.countError.textContent = state.errors.length;
+            el.reviewPanel.classList.add('visible');
+            el.reviewMessage.textContent = unresolved.length
+                ? `Đã gom ${required.length} sản phẩm IMPORT LABELS thành ${state.brandGroups.length} brand: tự động ${detected}, chọn thủ công ${manual}; còn ${unresolved.length} brand cần bổ sung.`
+                : `Đã xác định vai trò cho toàn bộ ${state.brandGroups.length} brand (${required.length} sản phẩm IMPORT LABELS). Có thể bắt đầu chuyển HTML.`;
+            el.convertButton.disabled = state.processing || unresolved.length > 0 || state.prepared.length === 0;
+            el.convertButton.textContent = `Bắt đầu chuyển HTML (${state.brandGroups.length - unresolved.length}/${state.brandGroups.length} brand)`;
+            el.fillButton.disabled = true;
+            el.approveAllButton.disabled = true;
+            el.errorLogButton.disabled = state.errors.length === 0;
+            el.errorLogButton.textContent = `Tải log lỗi (${state.errors.length})`;
+            el.overwriteConflictsButton.disabled = true;
+            return;
+        }
         const complete = state.groups.filter(group => missingLanguages(group).length === 0).length;
         const eligibleGroups = state.groups.filter(group => group.selectedRow && writableLanguages(group).length > 0 && !group.saved);
         const approvedGroups = state.groups.filter(group => group.approved && group.selectedRow && writableLanguages(group).length > 0);
         const approvedCells = approvedGroups.reduce((total, group) => total + writableLanguages(group).length, 0);
+        const approvedOverwriteCells = approvedGroups.reduce((total, group) => total + (state.overwriteConflicts ? conflictLanguages(group).length : 0), 0);
+        const totalConflictCells = state.groups.reduce((total, group) => total + conflictLanguages(group).length, 0);
         const review = state.groups.filter(group => !group.saved && (!group.selectedRow || writableLanguages(group).length === 0 || !group.approved)).length;
         el.countTotal.textContent = state.groups.length;
         el.countReady.textContent = complete;
@@ -889,7 +1287,7 @@
         el.countError.textContent = state.errors.length;
         el.reviewPanel.classList.toggle('visible', state.processed);
         el.reviewMessage.textContent = state.processed
-            ? `${complete}/${state.groups.length} sản phẩm đủ 15 sau khi gộp; đã duyệt ${approvedGroups.length} sản phẩm với ${approvedCells} ô HTML mới.`
+            ? `${complete}/${state.groups.length} sản phẩm đủ 15 sau khi gộp; đã duyệt ${approvedGroups.length} sản phẩm với ${approvedCells} ô HTML sẽ ghi${approvedOverwriteCells ? `, gồm ${approvedOverwriteCells} ô ghi đè` : ''}.`
             : 'Có thể duyệt và lưu từng phần; dữ liệu đã lưu sẽ được dùng cho lượt tiếp theo.';
         el.fillButton.disabled = !state.processed || approvedGroups.length === 0 || state.saving;
         el.fillButton.textContent = state.saving ? 'Đang lưu trực tiếp…' : `Duyệt & Lưu vào file Odoo (${approvedGroups.length})`;
@@ -898,6 +1296,22 @@
         el.approveAllButton.textContent = allApproved ? `Bỏ duyệt tất cả (${eligibleGroups.length})` : `Duyệt tất cả (${eligibleGroups.length})`;
         el.errorLogButton.disabled = state.errors.length === 0;
         el.errorLogButton.textContent = `Tải log lỗi (${state.errors.length})`;
+        el.overwriteConflictsButton.disabled = !state.processed || totalConflictCells === 0 || state.saving;
+        el.overwriteConflictsButton.classList.toggle('btn-overwrite-active', state.overwriteConflicts);
+        el.overwriteConflictsButton.setAttribute('aria-pressed', String(state.overwriteConflicts));
+        el.overwriteConflictsButton.textContent = state.overwriteConflicts
+            ? `Hủy ghi lại nội dung xung đột (${totalConflictCells})`
+            : `Ghi lại nội dung xung đột (${totalConflictCells})`;
+        el.convertButton.disabled = true;
+    }
+
+    function toggleOverwriteConflicts() {
+        if (!state.processed || state.saving) return;
+        const totalConflictCells = state.groups.reduce((total, group) => total + conflictLanguages(group).length, 0);
+        if (!totalConflictCells) return;
+        state.overwriteConflicts = !state.overwriteConflicts;
+        state.groups.forEach(group => { group.approved = false; });
+        renderResults();
     }
 
     function approveAll() {
@@ -1075,18 +1489,22 @@
             const worksheet = workbook.Sheets[state.workbookSheetName];
             if (!worksheet) throw new Error('Không tìm thấy sheet Odoo ban đầu. Hãy mở lại file Excel.');
             let writtenCells = 0;
+            let overwrittenCells = 0;
             for (const group of approved) {
                 for (const language of writableLanguages(group)) {
                     const html = group.cells[language];
                     const column = state.headerMap.get(language);
                     if (!html || column == null) continue;
                     const address = XLSX.utils.encode_cell({ r: group.selectedRow.rowNumber - 1, c: column });
-                    if (clean(worksheet[address]?.v)) continue;
+                    const existingValue = clean(worksheet[address]?.v);
+                    if (existingValue && !state.overwriteConflicts) continue;
+                    if (existingValue && existingValue === clean(html)) continue;
                     worksheet[address] = { t: 's', v: html };
                     writtenCells += 1;
+                    if (existingValue) overwrittenCells += 1;
                 }
             }
-            if (!writtenCells) throw new Error('Không còn ô trống nào để lưu. Dữ liệu cũ trong Odoo được giữ nguyên.');
+            if (!writtenCells) throw new Error('Không còn ô nào cần lưu. Hãy kiểm tra chế độ ghi lại nội dung xung đột.');
 
             const output = XLSX.write(workbook, { type: 'array', bookType: 'xlsx', compression: true, cellStyles: true });
             const writable = await state.workbookHandle.createWritable();
@@ -1101,7 +1519,7 @@
                 group.approved = false;
                 group.saved = true;
             }
-            el.workbookMeta.textContent = `${updatedFile.name} — vừa lưu trực tiếp ${writtenCells} ô HTML cho ${approved.length} sản phẩm. File này sẵn sàng cho lượt Daily/Import tiếp theo.`;
+            el.workbookMeta.textContent = `${updatedFile.name} — vừa lưu trực tiếp ${writtenCells} ô HTML cho ${approved.length} sản phẩm${overwrittenCells ? `, trong đó ghi đè ${overwrittenCells} ô xung đột` : ''}. File này sẵn sàng cho lượt Daily/Import tiếp theo.`;
         } catch (error) {
             alert(`Không lưu được vào file Odoo: ${error.message || error}`);
         } finally {
@@ -1111,11 +1529,15 @@
     }
 
     function clearResults() {
+        state.prepared = [];
+        state.roleGroups = [];
         state.groups = [];
         state.errors = [];
         state.ignoredCount = 0;
         state.processed = false;
         state.processing = false;
+        state.phase = 'idle';
+        state.overwriteConflicts = false;
         renderResults();
     }
 
@@ -1130,7 +1552,10 @@
             workbookMeta: document.getElementById('odoo-workbook-meta'),
             sourceFiles: document.getElementById('odoo-source-files'),
             processButton: document.getElementById('odoo-process-button'),
+            convertButton: document.getElementById('odoo-convert-button'),
             resetButton: document.getElementById('odoo-reset-button'),
+            brandPanel: document.getElementById('odoo-brand-role-panel'),
+            brandBody: document.getElementById('odoo-brand-role-body'),
             resultsBody: document.getElementById('odoo-results-body'),
             countTotal: document.getElementById('odoo-count-total'),
             countReady: document.getElementById('odoo-count-ready'),
@@ -1139,6 +1564,7 @@
             reviewPanel: document.getElementById('odoo-review-panel'),
             reviewMessage: document.getElementById('odoo-review-message'),
             errorLogButton: document.getElementById('odoo-error-log-button'),
+            overwriteConflictsButton: document.getElementById('odoo-overwrite-conflicts-button'),
             approveAllButton: document.getElementById('odoo-approve-all-button'),
             fillButton: document.getElementById('odoo-fill-button'),
             previewBackdrop: document.getElementById('odoo-preview-backdrop'),
@@ -1157,8 +1583,10 @@
 
         el.workbookButton.addEventListener('click', chooseWorkingWorkbook);
         el.processButton.addEventListener('click', processSources);
+        el.convertButton.addEventListener('click', convertPreparedSources);
         el.resetButton.addEventListener('click', resetAll);
         el.errorLogButton.addEventListener('click', exportErrorLog);
+        el.overwriteConflictsButton.addEventListener('click', toggleOverwriteConflicts);
         el.approveAllButton.addEventListener('click', approveAll);
         el.fillButton.addEventListener('click', fillWorkbook);
         el.previewLanguage.addEventListener('change', updatePreview);
@@ -1176,6 +1604,15 @@
         restoreWorkingWorkbook();
     }
 
-    window.odooFillTool = { REQUIRED_LANGUAGES, OPTIONAL_LANGUAGES, normalizeName };
+    window.odooFillTool = {
+        REQUIRED_LANGUAGES,
+        OPTIONAL_LANGUAGES,
+        normalizeName,
+        normalizeProductMatchName,
+        versionInfoForPath: folderVersionInfo,
+        versionTimestampForDescriptor: descriptorVersionTimestamp,
+        explicitVersionRankForPath: sourcePath => descriptorExplicitVersionRank({ sourcePath }),
+        officialVersionRankForPath: sourcePath => descriptorDraftRank({ sourcePath })
+    };
     document.addEventListener('DOMContentLoaded', init);
 })();
