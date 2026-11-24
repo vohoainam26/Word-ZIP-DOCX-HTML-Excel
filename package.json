@@ -1,0 +1,18 @@
+{
+  "name": "word-zip-docx-html-excel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Word ZIP / DOCX to HTML Excel converter and Product Label Checker",
+  "scripts": {
+    "build": "echo Build complete. Static assets ready for deployment."
+  },
+  "keywords": [
+    "odoo",
+    "shoptet",
+    "labels",
+    "docx",
+    "xlsx"
+  ],
+  "author": "",
+  "license": "ISC"
+}

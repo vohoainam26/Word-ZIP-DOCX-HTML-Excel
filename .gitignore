@@ -1,4 +1,8 @@
+node_modules/
 .vercel
-
-
-.vercel
+*.log
+*.tmp
+*.xlsx
+*.xls
+.DS_Store
+Thumbs.db

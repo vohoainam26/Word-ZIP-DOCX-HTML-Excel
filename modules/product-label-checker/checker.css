@@ -1,0 +1,639 @@
+/**
+ * Product Label Checker - Stylesheet
+ * Blends with existing app theme (--surface, --primary, --border, --text, --shadow).
+ */
+
+.checker-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 10px;
+}
+
+/* Upload & Control Panel */
+.checker-top-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+
+.checker-upload-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.checker-drop-zone {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 18px;
+    border: 1.5px dashed var(--primary);
+    border-radius: 10px;
+    background: rgba(49, 87, 213, 0.05);
+    color: var(--primary-dark);
+    font-size: 0.92rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.checker-drop-zone:hover,
+.checker-drop-zone.dragover {
+    background: rgba(49, 87, 213, 0.12);
+    border-color: var(--primary-dark);
+    transform: translateY(-1px);
+}
+
+.checker-btn-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.checker-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 40px;
+    padding: 8px 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+
+.checker-btn-primary {
+    background: var(--primary);
+    color: #fff;
+}
+
+.checker-btn-primary:hover {
+    background: var(--primary-dark);
+}
+
+.checker-btn-secondary {
+    background: #fff;
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.checker-btn-secondary:hover {
+    background: var(--surface-soft);
+    border-color: #b0c0d8;
+}
+
+.checker-file-info {
+    font-size: 0.88rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.checker-file-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 700;
+    font-size: 0.82rem;
+}
+
+/* Workspace Grid: Sidebar + Main Review */
+.checker-workspace {
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
+}
+
+/* Sidebar */
+.checker-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.checker-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 16px;
+}
+
+.checker-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.checker-stat-item {
+    padding: 10px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.checker-stat-val {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--primary-dark);
+}
+
+.checker-stat-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+/* Search Box */
+.checker-search-wrap {
+    position: relative;
+}
+
+.checker-search-input {
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    outline: none;
+    background: #fff;
+    color: var(--text);
+    transition: border-color 0.2s;
+}
+
+.checker-search-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(49, 87, 213, 0.15);
+}
+
+/* Product List */
+.checker-product-list {
+    max-height: 480px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-right: 4px;
+}
+
+.checker-product-item {
+    display: block;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    text-align: left;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.checker-product-item:hover {
+    background: rgba(49, 87, 213, 0.08);
+    border-color: rgba(49, 87, 213, 0.2);
+}
+
+.checker-product-item.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary-dark);
+}
+
+.checker-product-item strong {
+    display: block;
+    font-size: 0.88rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.checker-product-item span {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+.checker-product-item.active span {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Main Display Area */
+.checker-main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+/* Product Header Bar */
+.checker-prod-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+.checker-prod-title h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--text);
+    line-height: 1.35;
+}
+
+.checker-prod-code {
+    margin: 4px 0 0;
+    font-size: 0.88rem;
+    color: var(--muted);
+}
+
+.checker-nav-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.checker-counter {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--muted);
+    padding: 0 6px;
+}
+
+/* 16 Labels Grid */
+.checker-labels-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.checker-label-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: 0 4px 14px rgba(35, 55, 90, 0.06);
+    overflow: hidden;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.checker-label-card:hover {
+    box-shadow: 0 8px 22px rgba(35, 55, 90, 0.12);
+}
+
+.checker-label-card.status-missing {
+    border-color: #fca5a5;
+}
+
+.checker-label-card.status-contamination {
+    border-color: #f87171;
+    background: #fffafa;
+}
+
+.checker-label-card.status-warning {
+    border-color: #fcd34d;
+}
+
+/* Card Header */
+.checker-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--surface-soft);
+    border-bottom: 1px solid var(--border);
+}
+
+.checker-lang-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 800;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+
+.checker-lang-pill {
+    display: inline-grid;
+    place-items: center;
+    min-width: 32px;
+    height: 24px;
+    border-radius: 5px;
+    background: var(--primary);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 800;
+}
+
+.checker-status-badge {
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.checker-status-badge.badge-ready {
+    background: var(--success-soft);
+    color: var(--success);
+}
+
+.checker-status-badge.badge-missing {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+.checker-status-badge.badge-contamination {
+    background: #ffe4e6;
+    color: #b91c1c;
+}
+
+.checker-status-badge.badge-warning {
+    background: var(--warning-soft);
+    color: var(--warning);
+}
+
+/* Paper Document Preview */
+.checker-paper-wrap {
+    padding: 10px;
+    background: #edf1f7;
+    flex: 1;
+}
+
+.checker-paper {
+    height: 290px;
+    overflow-y: auto;
+    padding: 16px 14px;
+    background: #ffffff;
+    border: 1px solid #d5dde8;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(20, 35, 60, 0.08);
+    color: #1a2332;
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.checker-paper p {
+    margin: 0 0 8px;
+}
+
+.checker-paper table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+    font-size: 11.5px;
+}
+
+.checker-paper td,
+.checker-paper th {
+    padding: 3px 6px;
+    border: 1px solid #ccc;
+}
+
+.checker-paper.empty-paper {
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    font-style: italic;
+    background: #fdfefe;
+}
+
+/* Card Action Footer */
+.checker-card-footer {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    background: #fff;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.checker-zoom-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.checker-zoom-btn:hover {
+    background: var(--surface-soft);
+    border-color: var(--primary);
+    color: var(--primary);
+}
+
+/* Modal Inspection Dialog */
+.checker-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(15, 25, 45, 0.65);
+    backdrop-filter: blur(2px);
+}
+
+.checker-modal-backdrop[hidden] {
+    display: none;
+}
+
+.checker-modal-dialog {
+    width: min(900px, 96vw);
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+}
+
+.checker-modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    background: var(--text);
+    color: #fff;
+}
+
+.checker-modal-head h3 {
+    margin: 0;
+    font-size: 1.05rem;
+}
+
+.checker-modal-close {
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.checker-modal-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.checker-modal-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 10px 18px 0;
+    background: var(--surface-soft);
+    border-bottom: 1px solid var(--border);
+}
+
+.checker-modal-tab {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: #fff;
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.checker-modal-tab.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+.checker-modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    background: #edf1f7;
+    max-height: calc(92vh - 120px);
+}
+
+.checker-modal-paper {
+    min-height: 480px;
+    padding: 32px 36px;
+    background: #fff;
+    border: 1px solid #d5dde8;
+    border-radius: 6px;
+    box-shadow: var(--shadow);
+    color: #101828;
+    font-family: Arial, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.checker-code-view {
+    margin: 0;
+    padding: 16px;
+    background: #111b27;
+    color: #d1e2f3;
+    font-family: Consolas, "Fira Code", monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.checker-code-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+/* Toast */
+.checker-toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 10000;
+    padding: 12px 20px;
+    background: #1e293b;
+    color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    font-size: 0.9rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: checkerToastIn 0.2s ease-out;
+}
+
+.checker-toast[hidden] {
+    display: none;
+}
+
+@keyframes checkerToastIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1280px) {
+    .checker-labels-grid {
+        grid-template-columns: repeat(3, minmax(220px, 1fr));
+    }
+}
+
+@media (max-width: 960px) {
+    .checker-workspace {
+        grid-template-columns: 1fr;
+    }
+    .checker-labels-grid {
+        grid-template-columns: repeat(2, minmax(220px, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .checker-labels-grid {
+        grid-template-columns: 1fr;
+    }
+    .checker-top-panel {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

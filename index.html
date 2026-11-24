@@ -8,8 +8,12 @@
     <link rel="icon" href="data:,">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>if (!window.XLSX) document.write('<script src="vendor/xlsx.full.min.js"><\/script>');</script>
+    <script src="vendor/purify.min.js"></script>
+    <script>if (!window.DOMPurify) document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"><\/script>');</script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="word_zip_multilang.js?v=20261103-3"></script>
+    <link rel="stylesheet" href="modules/product-label-checker/checker.css">
     <style>
         :root {
             --bg: #f3f6fb;
@@ -814,6 +818,7 @@
             <button class="tool-tab active" type="button" data-tool-tab="summary">Summary Labels</button>
             <button class="tool-tab" type="button" data-tool-tab="import">IMPORT LABELS</button>
             <button class="tool-tab" type="button" data-tool-tab="odoo">ODOO FILL</button>
+            <button class="tool-tab" type="button" data-tool-tab="checker">LABEL CHECKER</button>
         </nav>
 
         <div class="tool-view" data-tool-view="summary">
@@ -1089,6 +1094,110 @@
                     </div>
                 </div>
             </section>
+        </div>
+
+        <div class="tool-view" data-tool-view="checker" hidden>
+            <div id="checker-view-root" class="checker-container">
+                <!-- Top Control Bar -->
+                <div class="checker-top-panel">
+                    <div class="checker-upload-box">
+                        <label id="checker-drop-zone" class="checker-drop-zone" for="checker-file-input">
+                            <span>📁</span>
+                            <strong>Kéo thả file Excel vào đây (.xlsx, .xls)</strong>
+                        </label>
+                        <input id="checker-file-input" type="file" accept=".xlsx,.xls" hidden>
+                        <div class="checker-btn-group">
+                            <button id="checker-choose-file-btn" class="checker-btn checker-btn-primary" type="button">Chọn file Excel</button>
+                            <button id="checker-use-demo-btn" class="checker-btn checker-btn-secondary" type="button">Dữ liệu mẫu</button>
+                        </div>
+                    </div>
+                    <div class="checker-file-info">
+                        Trạng thái: <span id="checker-file-status" class="checker-file-pill">Chưa tải file</span>
+                    </div>
+                </div>
+
+                <!-- Main Workspace: Sidebar + 16 Labels Grid -->
+                <div class="checker-workspace">
+                    <!-- Left Sidebar -->
+                    <aside class="checker-sidebar">
+                        <!-- Stats Card -->
+                        <div class="checker-card">
+                            <div class="checker-stats-grid">
+                                <div class="checker-stat-item">
+                                    <span id="checker-stat-products" class="checker-stat-val">0</span>
+                                    <span class="checker-stat-label">Tổng sản phẩm</span>
+                                </div>
+                                <div class="checker-stat-item">
+                                    <span id="checker-stat-complete" class="checker-stat-val" style="color:var(--success)">0</span>
+                                    <span class="checker-stat-label">Đủ 16 ngôn ngữ</span>
+                                </div>
+                                <div class="checker-stat-item" style="grid-column: 1 / -1;">
+                                    <span id="checker-stat-missing" class="checker-stat-val" style="color:var(--danger)">0</span>
+                                    <span class="checker-stat-label">Thiếu ngôn ngữ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Search & Product List Card -->
+                        <div class="checker-card">
+                            <div class="checker-search-wrap" style="margin-bottom: 12px;">
+                                <input id="checker-search-input" class="checker-search-input" type="search" placeholder="🔍 Tìm kiếm mã hoặc tên SP...">
+                            </div>
+                            <div id="checker-product-list" class="checker-product-list">
+                                <!-- Products rendered dynamically -->
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Main Label Display -->
+                    <section class="checker-main">
+                        <div class="checker-prod-header">
+                            <div class="checker-prod-title">
+                                <h2 id="checker-product-title">(Chưa chọn sản phẩm)</h2>
+                                <p id="checker-product-code" class="checker-prod-code"></p>
+                            </div>
+                            <div class="checker-nav-controls">
+                                <button id="checker-prev-btn" class="checker-btn checker-btn-secondary" type="button">◀ Trước</button>
+                                <span id="checker-counter" class="checker-counter">0 / 0</span>
+                                <button id="checker-next-btn" class="checker-btn checker-btn-secondary" type="button">Tiếp ▶</button>
+                            </div>
+                        </div>
+
+                        <!-- 16 Labels Grid -->
+                        <div id="checker-labels-grid" class="checker-labels-grid">
+                            <!-- 16 language cards rendered dynamically -->
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Modal Inspection Dialog -->
+                <div id="checker-modal" class="checker-modal-backdrop" hidden>
+                    <div class="checker-modal-dialog">
+                        <div class="checker-modal-head">
+                            <h3 id="checker-modal-title">Xem chi tiết nhãn</h3>
+                            <button id="checker-modal-close" class="checker-modal-close" type="button" aria-label="Đóng">×</button>
+                        </div>
+                        <div class="checker-modal-tabs">
+                            <button id="checker-modal-render-tab" class="checker-modal-tab active" type="button">Xem trước nhãn (Render)</button>
+                            <button id="checker-modal-code-tab" class="checker-modal-tab" type="button">Mã HTML nguồn (Code)</button>
+                        </div>
+                        <div class="checker-modal-body">
+                            <div id="checker-modal-render-wrap">
+                                <div id="checker-modal-render" class="checker-modal-paper"></div>
+                            </div>
+                            <div id="checker-modal-code-wrap" hidden>
+                                <div class="checker-code-toolbar">
+                                    <button id="checker-modal-copy-btn" class="checker-btn checker-btn-secondary" type="button" style="font-size:0.8rem;padding:4px 10px;">📋 Sao chép HTML</button>
+                                </div>
+                                <pre id="checker-modal-code" class="checker-code-view"></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toast Notification -->
+                <div id="checker-toast" class="checker-toast" hidden></div>
+            </div>
         </div>
     </main>
 
@@ -1892,6 +2001,21 @@
     </script>
     <script src="import_labels.js?v=20261113-2"></script>
     <script src="odoo_fill.js?v=20261113-2"></script>
+    <script src="modules/product-label-checker/excel-reader.js"></script>
+    <script src="modules/product-label-checker/html-validator.js"></script>
+    <script src="modules/product-label-checker/checker.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const checkerTab = document.querySelector('.tool-tab[data-tool-tab="checker"]');
+            if (checkerTab) {
+                checkerTab.addEventListener('click', () => {
+                    if (window.ProductLabelChecker && !window.ProductLabelChecker.isInitialized()) {
+                        window.ProductLabelChecker.init();
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 
 </html>
